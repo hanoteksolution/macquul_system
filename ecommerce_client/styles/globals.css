@@ -1,0 +1,59 @@
+@tailwind base; 
+@tailwind components; 
+@tailwind utilities; 
+
+:root {
+  --primary-color: #3B82F6;
+  --secondary-color: #8B5CF6;
+  --accent-color: #F59E0B;
+}
+
+html,body,#__next{
+  height:100%
+} 
+
+body{ 
+  @apply bg-gray-50 text-gray-900;
+} 
+
+.container{ 
+  @apply max-w-7xl mx-auto px-4;
+}
+
+/* Dynamic color classes */
+.bg-primary {
+  background-color: var(--primary-color);
+}
+
+.text-primary {
+  color: var(--primary-color);
+}
+
+.border-primary {
+  border-color: var(--primary-color);
+}
+
+.bg-secondary {
+  background-color: var(--secondary-color);
+}
+
+.text-secondary {
+  color: var(--secondary-color);
+}
+
+.bg-accent {
+  background-color: var(--accent-color);
+}
+
+.text-accent {
+  color: var(--accent-color);
+}
+
+/* Dynamic gradient backgrounds */
+.bg-gradient-primary {
+  background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+}
+
+.bg-gradient-secondary {
+  background: linear-gradient(135deg, var(--secondary-color), var(--accent-color));
+}
