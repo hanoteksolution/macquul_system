@@ -1,8 +1,7 @@
 import '../styles/globals.css';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import { ThemeProvider } from '../contexts/ThemeContext';
-import { PermissionProvider } from '../contexts/PermissionContext';
+import AppProviders from '../components/AppProviders';
 
 function AuthGate({ children }) {
   const router = useRouter();
@@ -25,12 +24,10 @@ function AuthGate({ children }) {
 
 export default function MyApp({ Component, pageProps }) {
   return (
-    <ThemeProvider>
-      <PermissionProvider>
-        <AuthGate>
-          <Component {...pageProps} />
-        </AuthGate>
-      </PermissionProvider>
-    </ThemeProvider>
+    <AppProviders>
+      <AuthGate>
+        <Component {...pageProps} />
+      </AuthGate>
+    </AppProviders>
   );
 }

@@ -3,10 +3,27 @@ from .models import Category, Product
 
 
 class CategorySerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
+    product_count = serializers.SerializerMethodField()
+
     class Meta:
         model = Category
-        fields = ['id', 'name', 'description', 'created_at', 'updated_at']
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        fields = [
+            'id', 'name', 'description', 'icon', 'image', 'image_url',
+            'product_count', 'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'image_url', 'product_count']
+
+    def get_image_url(self, obj):
+        if not obj.image:
+            return None
+        request = self.context.get('request')
+        if request:
+            return request.build_absolute_uri(obj.image.url)
+        return obj.image.url
+
+    def get_product_count(self, obj):
+        return obj.products.count()
 
 
 class ProductSerializer(serializers.ModelSerializer):

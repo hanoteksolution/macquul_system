@@ -18,8 +18,10 @@ import {
 } from '@heroicons/react/24/outline';
 import AdminLayout from '../components/AdminLayout';
 import api from '../services/api';
+import { useNotify } from '../contexts/NotifyContext';
 
 export default function Settings() {
+  const { toast, confirm } = useNotify();
   const [activeTab, setActiveTab] = useState('general');
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState([]);
@@ -115,15 +117,19 @@ export default function Settings() {
       await api.patch(`/auth/users/${userId}/`, updates);
       setEditingUser(null); // Close the modal
       loadUsers(); // Refresh the user list
-      alert('User updated successfully!');
+      toast.success('User updated successfully!');
     } catch (error) {
       console.error('Failed to update user:', error);
-      alert('Failed to update user. Please try again.');
+      toast.error('Failed to update user. Please try again.');
     }
   };
 
   const handleDeleteUser = async (userId) => {
-    if (confirm('Are you sure you want to delete this user?')) {
+    if (await confirm('Are you sure you want to delete this user?', {
+      title: 'Delete user',
+      destructive: true,
+      confirmLabel: 'Delete',
+    })) {
       try {
         await api.delete(`/auth/users/${userId}/`);
         loadUsers();
@@ -141,12 +147,12 @@ export default function Settings() {
       const response = await api.post('/settings/debug/', settings);
       
       // Show success message
-      alert('Settings updated successfully! Changes will appear on the client site immediately.');
+      toast.success('Settings updated successfully! Changes will appear on the client site immediately.');
       console.log('Settings updated:', section, settings);
     } catch (error) {
       console.error('Failed to update settings:', error);
       console.error('Error details:', error.response?.data);
-      alert('Failed to update settings. Check console for details.');
+      toast.error('Failed to update settings. Check console for details.');
     } finally {
       setLoading(false);
     }

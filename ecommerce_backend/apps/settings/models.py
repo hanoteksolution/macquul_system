@@ -72,6 +72,14 @@ class SiteSettings(models.Model):
         ('GBP', 'British Pound'),
     ]
     currency = models.CharField(max_length=3, choices=CURRENCY_CHOICES, default='USD')
+    default_locale = models.CharField(max_length=10, default='EN', help_text='Default language code shown in header')
+    search_placeholder = models.CharField(
+        max_length=120,
+        default='Search products, brands...',
+        help_text='Header search input placeholder',
+    )
+    promo_code = models.CharField(max_length=40, blank=True, default='WELCOME15', help_text='Member discount promo code')
+    member_discount_percent = models.PositiveSmallIntegerField(default=15)
     tax_rate = models.DecimalField(max_digits=5, decimal_places=2, default=10.00)
     shipping_fee = models.DecimalField(max_digits=10, decimal_places=2, default=5.99)
     free_shipping_threshold = models.DecimalField(max_digits=10, decimal_places=2, default=50.00)

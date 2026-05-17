@@ -1,4 +1,7 @@
 import AdminLayout from '../components/AdminLayout';
+import MetricCardsRow from '../components/ui/MetricCardsRow';
+import { Package, ArrowDown, ArrowUp, Warehouse } from 'lucide-react';
+
 import api from '../services/api';
 import { useEffect, useState } from 'react';
 import { 
@@ -65,13 +68,14 @@ export default function StockManagement() {
   return (
     <AdminLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
-            <CubeIcon className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Stock Management</h1>
-        </div>
+        <MetricCardsRow
+          metrics={[
+            { label: 'Total products', value: String(products.length), subtitle: 'In stock system', icon: Package, accent: 'indigo' },
+            { label: 'In stock', value: String(products.filter((p) => (p.stock || 0) > 0).length), subtitle: 'Available units', icon: ArrowUp, accent: 'emerald' },
+            { label: 'Out of stock', value: String(products.length - products.filter((p) => (p.stock || 0) > 0).length), subtitle: 'Zero quantity', icon: ArrowDown, accent: 'rose' },
+            { label: 'Warehouses', value: '1', subtitle: 'Active locations', icon: Warehouse, accent: 'violet' },
+          ]}
+        />
 
         {/* Tabs */}
         <div className="flex space-x-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg w-fit">

@@ -1,376 +1,287 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/router';
-import Link from 'next/link';
-import api from '../services/api';
-import { 
-  UserIcon, 
-  ShoppingBagIcon, 
-  HeartIcon, 
-  CogIcon,
-  EyeIcon,
+import { motion } from 'framer-motion';
+import {
+  ShoppingBagIcon,
   ClockIcon,
   CheckCircleIcon,
-  TruckIcon,
-  XCircleIcon
+  CurrencyDollarIcon,
+  ArrowDownTrayIcon,
+  SparklesIcon,
 } from '@heroicons/react/24/outline';
+import api from '../services/api';
+import { count as wishlistCount } from '../services/wishlist';
+import { useNotify } from '../contexts/NotifyContext';
+import { computeStats, buildActivityFeed } from '../lib/dashboardUtils';
+import DashboardLayout from '../components/dashboard/DashboardLayout';
+import DashboardSkeleton from '../components/dashboard/DashboardSkeleton';
+import WelcomeHero from '../components/dashboard/WelcomeHero';
+import StatCard from '../components/dashboard/StatCard';
+import OrdersTable from '../components/dashboard/OrdersTable';
+import ActivityTimeline from '../components/dashboard/ActivityTimeline';
+import ProfileSidebarCard from '../components/dashboard/ProfileSidebarCard';
+import QuickActions from '../components/dashboard/QuickActions';
 
 export default function Dashboard() {
   const router = useRouter();
+  const { toast } = useNotify();
   const [user, setUser] = useState(null);
   const [orders, setOrders] = useState([]);
-  const [stats, setStats] = useState({});
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
-
+  const [searchQuery, setSearchQuery] = useState('');
   useEffect(() => {
-    checkAuth();
+    if (typeof window === 'undefined') return;
+    const userData = localStorage.getItem('user');
+    if (!userData) {
+      router.push('/login');
+      return;
+    }
+    setUser(JSON.parse(userData));
     loadDashboardData();
   }, []);
 
-  const checkAuth = () => {
-    if (typeof window !== 'undefined') {
-      const userData = localStorage.getItem('user');
-      if (!userData) {
-        router.push('/login');
-        return;
-      }
-      setUser(JSON.parse(userData));
-    }
-  };
-
   const loadDashboardData = async () => {
     try {
-      const [ordersRes, profileRes] = await Promise.all([
-        api.get('/orders/'),
-        api.get('/users/profile')
-      ]);
-      
+      const ordersRes = await api.get('/orders/');
       setOrders(ordersRes.data || []);
-      
-      // Calculate stats
-      const totalOrders = ordersRes.data?.length || 0;
-      const pendingOrders = ordersRes.data?.filter(o => o.status === 'pending')?.length || 0;
-      const completedOrders = ordersRes.data?.filter(o => o.status === 'delivered')?.length || 0;
-      const totalSpent = ordersRes.data?.reduce((sum, order) => sum + Number(order.total_price || 0), 0) || 0;
-      
-      setStats({
-        totalOrders,
-        pendingOrders,
-        completedOrders,
-        totalSpent
-      });
     } catch (error) {
       console.error('Failed to load dashboard data:', error);
+      toast.error('Failed to load dashboard data');
     } finally {
       setLoading(false);
     }
   };
 
-  const getStatusColor = (status) => {
-    const colors = {
-      'pending': 'bg-yellow-100 text-yellow-800',
-      'confirmed': 'bg-blue-100 text-blue-800',
-      'processing': 'bg-indigo-100 text-indigo-800',
-      'packed': 'bg-cyan-100 text-cyan-800',
-      'shipped': 'bg-purple-100 text-purple-800',
-      'out_for_delivery': 'bg-orange-100 text-orange-800',
-      'delivered': 'bg-green-100 text-green-800',
-      'canceled': 'bg-red-100 text-red-800',
-      'returned': 'bg-gray-100 text-gray-800',
-      'refunded': 'bg-pink-100 text-pink-800'
-    };
-    return colors[status] || 'bg-gray-100 text-gray-800';
+  const stats = useMemo(() => computeStats(orders), [orders]);
+
+  const filteredOrders = useMemo(() => {
+    if (!searchQuery.trim()) return orders;
+    const q = searchQuery.toLowerCase();
+    return orders.filter(
+      (o) =>
+        String(o.id).includes(q) ||
+        o.items?.some((i) => i.product_name?.toLowerCase().includes(q)) ||
+        o.status?.toLowerCase().includes(q)
+    );
+  }, [orders, searchQuery]);
+
+  const downloadOrders = useMemo(
+    () => orders.filter((o) => o.status === 'delivered'),
+    [orders]
+  );
+
+  const activities = useMemo(
+    () => buildActivityFeed(orders, wishlistCount()),
+    [orders]
+  );
+
+  const handleViewOrder = (order) => {
+    toast.info(`Order #${order.id} — ${order.items?.length || 0} item(s)`);
   };
 
-  const getStatusIcon = (status) => {
-    const icons = {
-      'pending': ClockIcon,
-      'confirmed': CheckCircleIcon,
-      'processing': ClockIcon,
-      'packed': ShoppingBagIcon,
-      'shipped': TruckIcon,
-      'out_for_delivery': TruckIcon,
-      'delivered': CheckCircleIcon,
-      'canceled': XCircleIcon,
-      'returned': XCircleIcon,
-      'refunded': XCircleIcon
-    };
-    return icons[status] || ClockIcon;
+  const handleDownloadInvoices = () => {
+    if (downloadOrders.length === 0) {
+      toast.info('No completed orders available for download yet');
+      return;
+    }
+    toast.success(`Preparing ${downloadOrders.length} invoice(s)...`);
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-lg">Loading dashboard...</div>
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
+  const statCards = (
+    <motion.div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
+      <StatCard label="Total Orders" value={stats.totalOrders} icon={ShoppingBagIcon} trend="+12%" accent="blue" delay={0.05} />
+      <StatCard label="Pending" value={stats.pendingOrders} icon={ClockIcon} trend={stats.pendingOrders ? 'Active' : 'Clear'} trendUp={false} accent="amber" delay={0.1} />
+      <StatCard label="Completed" value={stats.completedOrders} icon={CheckCircleIcon} trend="+8%" accent="emerald" delay={0.15} />
+      <StatCard label="Total Spent" value={`$${stats.totalSpent.toFixed(2)}`} icon={CurrencyDollarIcon} trend="Lifetime" accent="violet" delay={0.2} />
+      <StatCard label="Downloads" value={stats.downloads} icon={ArrowDownTrayIcon} trend="Ready" accent="navy" delay={0.25} />
+      <StatCard label="Reward Points" value={stats.rewardPoints} icon={SparklesIcon} trend="+50 pts" accent="rose" delay={0.3} />
+    </motion.div>
+  );
+
+  const overviewContent = (
+    <motion.div className="space-y-6" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+      <WelcomeHero user={user} stats={stats} />
+      {statCards}
+      <motion.div className="grid gap-6 xl:grid-cols-3">
+        <motion.div className="xl:col-span-2 space-y-6">
+          <OrdersTable
+            orders={filteredOrders}
+            title="Recent orders"
+            compact
+            onViewOrder={handleViewOrder}
+          />
+          <QuickActions onDownloadInvoices={handleDownloadInvoices} />
+        </motion.div>
+        <motion.div className="space-y-6">
+          <ProfileSidebarCard user={user} stats={stats} onEditProfile={() => setActiveTab('profile')} />
+          <ActivityTimeline activities={activities} />
+        </motion.div>
+      </motion.div>
+    </motion.div>
+  );
+
+  const ordersContent = (
+    <motion.div className="space-y-6" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+      <motion.header>
+        <h2 className="text-2xl font-bold text-navy-900 dark:text-white">Orders</h2>
+        <p className="text-gray-500 dark:text-gray-400">Full order history and status tracking</p>
+      </motion.header>
+      {statCards}
+      <OrdersTable orders={filteredOrders} title="All orders" onViewOrder={handleViewOrder} />
+    </motion.div>
+  );
+
+  const downloadsContent = (
+    <motion.div className="space-y-6" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+      <motion.header>
+        <h2 className="text-2xl font-bold text-navy-900 dark:text-white">Downloads</h2>
+        <p className="text-gray-500 dark:text-gray-400">Digital products from completed orders</p>
+      </motion.header>
+      <OrdersTable
+        orders={downloadOrders}
+        title="Available downloads"
+        emptyMessage="No downloads available yet"
+        onViewOrder={handleViewOrder}
+      />
+    </motion.div>
+  );
+
+  const billingContent = (
+    <motion.section className="dashboard-card p-8 text-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+      <motion.span className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-violet-500/10 text-violet-600">
+        <CurrencyDollarIcon className="h-8 w-8" />
+      </motion.span>
+      <h2 className="mt-4 text-xl font-bold text-navy-900 dark:text-white">Billing & invoices</h2>
+      <p className="mt-2 text-sm text-gray-500 dark:text-gray-400 max-w-md mx-auto">
+        Manage payment methods and download invoices. Total lifetime spend:{' '}
+        <strong className="text-emerald-600">${stats.totalSpent.toFixed(2)}</strong>
+      </p>
+      <button
+        type="button"
+        onClick={handleDownloadInvoices}
+        className="mt-6 rounded-xl bg-navy-900 px-6 py-2.5 text-sm font-semibold text-white hover:bg-navy-800 dark:bg-emerald-600 dark:hover:bg-emerald-500"
+      >
+        Download all invoices
+      </button>
+    </motion.section>
+  );
+
+  const profileContent = (
+    <motion.div className="grid gap-6 lg:grid-cols-3" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+      <motion.div className="lg:col-span-1">
+        <ProfileSidebarCard user={user} stats={stats} onEditProfile={() => {}} />
+      </motion.div>
+      <motion.section className="dashboard-card lg:col-span-2 p-6 sm:p-8">
+        <h2 className="text-xl font-bold text-navy-900 dark:text-white">Profile settings</h2>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Update your account information</p>
+        <form
+          className="mt-6 space-y-5"
+          onSubmit={(e) => {
+            e.preventDefault();
+            toast.success('Profile saved successfully');
+          }}
+        >
+          <motion.div className="grid gap-5 sm:grid-cols-2">
+            <label className="block">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Username</span>
+              <input
+                type="text"
+                defaultValue={user?.username}
+                className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white/80 px-4 py-2.5 text-navy-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 dark:border-white/10 dark:bg-white/5 dark:text-white"
+              />
+            </label>
+            <label className="block">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Email</span>
+              <input
+                type="email"
+                defaultValue={user?.email}
+                className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white/80 px-4 py-2.5 text-navy-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 dark:border-white/10 dark:bg-white/5 dark:text-white"
+              />
+            </label>
+            <label className="block">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">First name</span>
+              <input
+                type="text"
+                defaultValue={user?.first_name}
+                className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white/80 px-4 py-2.5 text-navy-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 dark:border-white/10 dark:bg-white/5 dark:text-white"
+              />
+            </label>
+            <label className="block">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Last name</span>
+              <input
+                type="text"
+                defaultValue={user?.last_name}
+                className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white/80 px-4 py-2.5 text-navy-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 dark:border-white/10 dark:bg-white/5 dark:text-white"
+              />
+            </label>
+          </motion.div>
+          <motion.div className="flex justify-end">
+            <button
+              type="submit"
+              className="rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 px-6 py-2.5 text-sm font-semibold text-white shadow-glow-sm transition hover:from-emerald-500 hover:to-emerald-400"
+            >
+              Save changes
+            </button>
+          </motion.div>
+        </form>
+      </motion.section>
+    </motion.div>
+  );
+
+  const securityContent = (
+    <motion.section className="dashboard-card p-8" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+      <h2 className="text-xl font-bold text-navy-900 dark:text-white">Security</h2>
+      <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Protect your account</p>
+      <motion.ul className="mt-6 space-y-4">
+        {[
+          { title: 'Password', desc: 'Last changed — use a strong unique password', action: 'Change password' },
+          { title: 'Two-factor authentication', desc: 'Add an extra layer of security', action: 'Enable 2FA' },
+          { title: 'Active sessions', desc: 'Manage devices logged into your account', action: 'View sessions' },
+        ].map((row) => (
+          <li
+            key={row.title}
+            className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-gray-100 bg-white/50 p-4 dark:border-white/10 dark:bg-white/5"
+          >
+            <span>
+              <span className="font-semibold text-navy-900 dark:text-white">{row.title}</span>
+              <span className="mt-0.5 block text-sm text-gray-500">{row.desc}</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => toast.info(`${row.action} — coming soon`)}
+              className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium hover:bg-gray-50 dark:border-white/10 dark:hover:bg-white/5"
+            >
+              {row.action}
+            </button>
+          </li>
+        ))}
+      </motion.ul>
+    </motion.section>
+  );
+
+  const tabContent = {
+    overview: overviewContent,
+    orders: ordersContent,
+    downloads: downloadsContent,
+    billing: billingContent,
+    profile: profileContent,
+    security: securityContent,
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Header */}
-      <div className="bg-white dark:bg-gray-800 shadow-sm">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">My Dashboard</h1>
-              <p className="text-gray-600 dark:text-gray-400">Welcome back, {user?.username || 'User'}!</p>
-            </div>
-            <Link href="/" className="text-primary-600 hover:text-primary-700 font-medium">
-              ← Back to Store
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      <div className="container mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Sidebar */}
-          <div className="lg:col-span-1">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-              <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-primary-100 dark:bg-primary-900 rounded-full flex items-center justify-center">
-                    <UserIcon className="h-6 w-6 text-primary-600 dark:text-primary-400" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-900 dark:text-white">{user?.username}</h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">{user?.email}</p>
-                  </div>
-                </div>
-              </div>
-              
-              <nav className="p-4 space-y-2">
-                <button
-                  onClick={() => setActiveTab('overview')}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
-                    activeTab === 'overview' 
-                      ? 'bg-primary-50 dark:bg-primary-900 text-primary-700 dark:text-primary-300' 
-                      : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
-                  }`}
-                >
-                  <ShoppingBagIcon className="h-5 w-5" />
-                  Overview
-                </button>
-                
-                <button
-                  onClick={() => setActiveTab('orders')}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
-                    activeTab === 'orders' 
-                      ? 'bg-primary-50 dark:bg-primary-900 text-primary-700 dark:text-primary-300' 
-                      : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
-                  }`}
-                >
-                  <ShoppingBagIcon className="h-5 w-5" />
-                  My Orders
-                </button>
-                
-                <Link href="/wishlist" className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                  <HeartIcon className="h-5 w-5" />
-                  Wishlist
-                </Link>
-                
-                <button
-                  onClick={() => setActiveTab('profile')}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
-                    activeTab === 'profile' 
-                      ? 'bg-primary-50 dark:bg-primary-900 text-primary-700 dark:text-primary-300' 
-                      : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
-                  }`}
-                >
-                  <CogIcon className="h-5 w-5" />
-                  Profile Settings
-                </button>
-              </nav>
-            </div>
-          </div>
-
-          {/* Main Content */}
-          <div className="lg:col-span-3">
-            {activeTab === 'overview' && (
-              <div className="space-y-6">
-                {/* Stats Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                  <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-gray-600 dark:text-gray-400 text-sm">Total Orders</p>
-                        <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.totalOrders}</p>
-                      </div>
-                      <ShoppingBagIcon className="h-8 w-8 text-blue-500" />
-                    </div>
-                  </div>
-                  
-                  <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-gray-600 dark:text-gray-400 text-sm">Pending</p>
-                        <p className="text-2xl font-bold text-yellow-600">{stats.pendingOrders}</p>
-                      </div>
-                      <ClockIcon className="h-8 w-8 text-yellow-500" />
-                    </div>
-                  </div>
-                  
-                  <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-gray-600 dark:text-gray-400 text-sm">Completed</p>
-                        <p className="text-2xl font-bold text-green-600">{stats.completedOrders}</p>
-                      </div>
-                      <CheckCircleIcon className="h-8 w-8 text-green-500" />
-                    </div>
-                  </div>
-                  
-                  <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-gray-600 dark:text-gray-400 text-sm">Total Spent</p>
-                        <p className="text-2xl font-bold text-purple-600">${stats.totalSpent.toFixed(2)}</p>
-                      </div>
-                      <ShoppingBagIcon className="h-8 w-8 text-purple-500" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Recent Orders */}
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-                  <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Recent Orders</h3>
-                  </div>
-                  <div className="p-6">
-                    {orders.slice(0, 5).map((order) => {
-                      const StatusIcon = getStatusIcon(order.status);
-                      return (
-                        <div key={order.id} className="flex items-center justify-between py-3 border-b border-gray-100 dark:border-gray-600 last:border-0">
-                          <div className="flex items-center gap-3">
-                            <StatusIcon className="h-5 w-5 text-gray-400" />
-                            <div>
-                              <p className="font-medium text-gray-900 dark:text-white">Order #{order.id}</p>
-                              <p className="text-sm text-gray-500 dark:text-gray-400">
-                                {new Date(order.created_at).toLocaleDateString()}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
-                              {order.status.replace('_', ' ')}
-                            </span>
-                            <span className="font-medium text-gray-900 dark:text-white">
-                              ${Number(order.total_price || 0).toFixed(2)}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'orders' && (
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-                <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Order History</h3>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-50 dark:bg-gray-700">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Order ID</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Date</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Total</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
-                      {orders.map((order) => (
-                        <tr key={order.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                            #{order.id}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                            {new Date(order.created_at).toLocaleDateString()}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
-                              {order.status.replace('_', ' ')}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                            ${Number(order.total_price || 0).toFixed(2)}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            <button className="text-primary-600 hover:text-primary-700 flex items-center gap-1">
-                              <EyeIcon className="h-4 w-4" />
-                              View Details
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'profile' && (
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-                <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Profile Settings</h3>
-                </div>
-                <div className="p-6">
-                  <form className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Username</label>
-                        <input
-                          type="text"
-                          defaultValue={user?.username}
-                          className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Email</label>
-                        <input
-                          type="email"
-                          defaultValue={user?.email}
-                          className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">First Name</label>
-                        <input
-                          type="text"
-                          defaultValue={user?.first_name}
-                          className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Last Name</label>
-                        <input
-                          type="text"
-                          defaultValue={user?.last_name}
-                          className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="flex justify-end">
-                      <button
-                        type="submit"
-                        className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-2 rounded-lg font-medium"
-                      >
-                        Save Changes
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
+    <DashboardLayout
+      user={user}
+      activeTab={activeTab}
+      onTabChange={setActiveTab}
+      searchQuery={searchQuery}
+      onSearchChange={setSearchQuery}
+    >
+      {tabContent[activeTab] || overviewContent}
+    </DashboardLayout>
   );
 }

@@ -12,13 +12,14 @@ import {
   ArrowPathIcon,
   CurrencyDollarIcon
 } from '@heroicons/react/24/outline';
-import { 
-  ShoppingBagIcon,
-  CheckCircleIcon,
-  ArrowTrendingUpIcon
-} from '@heroicons/react/24/solid';
+import { ShoppingBagIcon, CheckCircleIcon } from '@heroicons/react/24/solid';
+import { useNotify } from '../contexts/NotifyContext';
+import MetricCardsRow from '../components/ui/MetricCardsRow';
+import PageActions from '../components/ui/PageActions';
+import { ShoppingBag, Clock, CheckCircle, DollarSign, RefreshCw } from 'lucide-react';
 
 export default function OrdersManagement() {
+  const { toast } = useNotify();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -83,40 +84,6 @@ export default function OrdersManagement() {
     'Refunded': XCircleIcon
   };
 
-  const StatCard = ({ title, value, icon: Icon, color, subtitle, change, changeType }) => (
-    <div className="group relative bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-800 dark:to-gray-700/50 rounded-2xl shadow-lg hover:shadow-xl border border-gray-200/50 dark:border-gray-700/50 p-6 transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1">
-      <div className="absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-gray-100/20 dark:to-gray-600/20 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-
-      <div className="relative">
-        <div className="flex items-center justify-between mb-4">
-          <div className={`p-3 rounded-2xl ${color} shadow-lg group-hover:scale-110 transition-transform duration-300`}>
-            <Icon className="h-6 w-6 text-white" />
-          </div>
-          {change && (
-            <div className="flex items-center gap-1 text-xs font-medium">
-              <div className={`flex items-center gap-1 px-2 py-1 rounded-full ${
-                changeType === 'increase'
-                  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                  : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-              }`}>
-                <ArrowTrendingUpIcon className="h-3 w-3" />
-                {change}
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div>
-          <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">{title}</p>
-          <p className="text-3xl font-bold text-gray-900 dark:text-white mb-1">{value}</p>
-          {subtitle && (
-            <p className="text-xs text-gray-500 dark:text-gray-400">{subtitle}</p>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-
   useEffect(() => {
     loadOrders();
   }, []);
@@ -167,11 +134,11 @@ export default function OrdersManagement() {
       }
 
       // Show success message
-      alert(`Order #${orderId} status updated to ${displayStatus}`);
+      toast.success(`Order #${orderId} status updated to ${displayStatus}`);
     } catch (error) {
       console.error('Failed to update order status:', error);
       const errorMessage = error.response?.data?.detail || error.message;
-      alert(`Failed to update order status: ${errorMessage}`);
+      toast.error(`Failed to update order status: ${errorMessage}`);
     }
   };
 
@@ -204,68 +171,26 @@ export default function OrdersManagement() {
 
   return (
     <AdminLayout>
-      <div className="space-y-8">
-        {/* Header Section */}
-        <div className="bg-gradient-to-r from-blue-500 via-purple-500 to-blue-600 rounded-2xl p-8 text-white relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-r from-black/20 to-transparent"></div>
-          <div className="relative">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold mb-2">Orders Management</h1>
-                <p className="text-blue-100 text-lg">Track and manage customer orders efficiently</p>
-              </div>
-              <button
-                onClick={loadOrders}
-                className="flex items-center gap-3 bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-200 hover:scale-105 shadow-lg"
-              >
-                <ArrowPathIcon className="h-5 w-5" />
-                Refresh
-              </button>
-            </div>
-          </div>
-          <div className="absolute -top-4 -right-4 w-24 h-24 bg-white/10 rounded-full blur-2xl"></div>
-          <div className="absolute -bottom-4 -left-4 w-32 h-32 bg-white/5 rounded-full blur-3xl"></div>
-        </div>
+      <div className="space-y-6">
+        <PageActions>
+          <button
+            type="button"
+            onClick={loadOrders}
+            className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Refresh
+          </button>
+        </PageActions>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <StatCard
-            title="Total Orders"
-            value={orders.length.toString()}
-            icon={ShoppingBagIcon}
-            color="bg-gradient-to-br from-blue-500 to-blue-600"
-            subtitle="All time orders"
-            change="+12.5%"
-            changeType="increase"
-          />
-          <StatCard
-            title="Pending Orders"
-            value={orders.filter(o => o.status === 'Pending').length.toString()}
-            icon={ClockIcon}
-            color="bg-gradient-to-br from-yellow-500 to-orange-500"
-            subtitle="Awaiting processing"
-            change="+5.2%"
-            changeType="increase"
-          />
-          <StatCard
-            title="Completed Orders"
-            value={orders.filter(o => o.status === 'Delivered').length.toString()}
-            icon={CheckCircleIcon}
-            color="bg-gradient-to-br from-green-500 to-emerald-600"
-            subtitle="Successfully delivered"
-            change="+18.7%"
-            changeType="increase"
-          />
-          <StatCard
-            title="Total Revenue"
-            value={`$${orders.reduce((sum, o) => sum + Number(o.total_price || 0), 0).toFixed(2)}`}
-            icon={CurrencyDollarIcon}
-            color="bg-gradient-to-br from-purple-500 to-pink-600"
-            subtitle="From all orders"
-            change="+23.1%"
-            changeType="increase"
-          />
-        </div>
+        <MetricCardsRow
+          metrics={[
+            { label: 'Total orders', value: String(orders.length), subtitle: 'All time orders', trend: '+12.5%', icon: ShoppingBag, accent: 'indigo' },
+            { label: 'Pending orders', value: String(orders.filter((o) => o.status === 'Pending').length), subtitle: 'Awaiting processing', trend: '+5.2%', icon: Clock, accent: 'amber' },
+            { label: 'Completed orders', value: String(orders.filter((o) => o.status === 'Delivered').length), subtitle: 'Successfully delivered', trend: '+18.7%', icon: CheckCircle, accent: 'emerald' },
+            { label: 'Total revenue', value: `$${orders.reduce((sum, o) => sum + Number(o.total_price || 0), 0).toFixed(2)}`, subtitle: 'From all orders', trend: '+23.1%', icon: DollarSign, accent: 'violet' },
+          ]}
+        />
 
         {/* Filters and Search */}
         <div className="bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-800 dark:to-gray-700/50 rounded-2xl shadow-lg border border-gray-200/50 dark:border-gray-700/50 p-6">

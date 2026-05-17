@@ -10,10 +10,20 @@ export function getWishlist() {
   }
 }
 
+function notifyWishlistChange() {
+  if (typeof window === 'undefined') return;
+  try {
+    window.dispatchEvent(new Event('storage'));
+    window.dispatchEvent(new Event('wishlist-updated'));
+  } catch {
+    /* ignore */
+  }
+}
+
 export function setWishlist(items) {
   if (typeof window === 'undefined') return;
   localStorage.setItem(KEY, JSON.stringify(items));
-  try { window.dispatchEvent(new Event('storage')); } catch {}
+  notifyWishlistChange();
 }
 
 export function addToWishlist(product) {

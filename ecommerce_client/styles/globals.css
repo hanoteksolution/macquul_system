@@ -1,59 +1,106 @@
-@tailwind base; 
-@tailwind components; 
-@tailwind utilities; 
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
 :root {
-  --primary-color: #3B82F6;
-  --secondary-color: #8B5CF6;
-  --accent-color: #F59E0B;
+  --font-geist: 'Inter', system-ui, sans-serif;
+  --brand: 99 102 241;
+  --violet: 139 92 246;
+  --emerald: 16 185 129;
+  --background: 248 250 252;
+  --foreground: 15 23 42;
+  --card: 255 255 255;
+  --border: 226 232 240;
+  --radius: 1rem;
 }
 
-html,body,#__next{
-  height:100%
-} 
-
-body{ 
-  @apply bg-gray-50 text-gray-900;
-} 
-
-.container{ 
-  @apply max-w-7xl mx-auto px-4;
+.dark {
+  --background: 9 9 11;
+  --foreground: 250 250 250;
+  --card: 24 24 27;
+  --border: 39 39 42;
 }
 
-/* Dynamic color classes */
+html,
+body,
+#__next {
+  height: 100%;
+}
+
+body {
+  @apply bg-slate-50 text-slate-900 antialiased dark:bg-zinc-950 dark:text-zinc-50;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+}
+
+.store-mesh {
+  @apply bg-slate-50 dark:bg-zinc-950;
+  background-image: var(--mesh-bg, radial-gradient(at 20% 20%, rgba(99, 102, 241, 0.12) 0px, transparent 50%));
+}
+
+.dark .store-mesh {
+  --mesh-bg: radial-gradient(at 20% 20%, rgba(99, 102, 241, 0.18) 0px, transparent 50%),
+    radial-gradient(at 80% 0%, rgba(139, 92, 246, 0.12) 0px, transparent 45%);
+}
+
+@layer components {
+  .glass-card {
+    @apply rounded-2xl border border-white/60 bg-white/70 shadow-glass backdrop-blur-xl dark:border-white/10 dark:bg-zinc-900/60;
+  }
+
+  .glass-nav {
+    @apply border-b border-white/20 bg-white/80 shadow-glass backdrop-blur-2xl dark:border-white/5 dark:bg-zinc-950/80;
+  }
+
+  .gradient-text {
+    @apply bg-gradient-brand bg-clip-text text-transparent;
+  }
+
+  .btn-gradient {
+    @apply relative overflow-hidden rounded-xl bg-gradient-to-r from-brand-600 via-violet-600 to-cyan-500 font-semibold text-white shadow-glow-sm transition hover:shadow-glow hover:brightness-110;
+  }
+
+  .skeleton-shine {
+    @apply animate-shimmer bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200 bg-[length:200%_100%] dark:from-zinc-800 dark:via-zinc-700 dark:to-zinc-800;
+  }
+}
+
+.container-store {
+  @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+}
+
+.auth-mesh {
+  @apply bg-slate-50 dark:bg-zinc-950;
+  background-image: radial-gradient(at 15% 10%, rgba(99, 102, 241, 0.14) 0px, transparent 45%),
+    radial-gradient(at 85% 90%, rgba(139, 92, 246, 0.1) 0px, transparent 40%);
+}
+
+/* Legacy dynamic theme hooks */
 .bg-primary {
-  background-color: var(--primary-color);
+  background-color: rgb(var(--brand));
 }
-
 .text-primary {
-  color: var(--primary-color);
+  color: rgb(var(--brand));
 }
-
 .border-primary {
-  border-color: var(--primary-color);
+  border-color: rgb(var(--brand));
 }
 
-.bg-secondary {
-  background-color: var(--secondary-color);
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  @apply rounded-full bg-slate-300 dark:bg-zinc-700;
 }
 
-.text-secondary {
-  color: var(--secondary-color);
-}
-
-.bg-accent {
-  background-color: var(--accent-color);
-}
-
-.text-accent {
-  color: var(--accent-color);
-}
-
-/* Dynamic gradient backgrounds */
-.bg-gradient-primary {
-  background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-}
-
-.bg-gradient-secondary {
-  background: linear-gradient(135deg, var(--secondary-color), var(--accent-color));
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
 }

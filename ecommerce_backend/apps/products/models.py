@@ -9,6 +9,12 @@ class Category(models.Model):
     """
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True)
+    image = models.ImageField(upload_to='categories/', blank=True, null=True)
+    icon = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text='Emoji or short label shown when no image is uploaded (e.g. 📱 or Electronics)',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -20,6 +26,12 @@ class Category(models.Model):
 
     def __str__(self):
         return self.name
+
+    @property
+    def image_url(self):
+        if self.image:
+            return self.image.url
+        return None
 
 
 class Product(models.Model):

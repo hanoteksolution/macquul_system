@@ -31,6 +31,8 @@ export function updateQty(productId, qty) {
   return items;
 }
 
+export const updateQuantity = updateQty;
+
 export function removeItem(productId) {
   const items = getCart().filter(i => i.product !== productId);
   setCart(items);

@@ -12,9 +12,11 @@ import {
   UserIcon,
   KeyIcon
 } from '@heroicons/react/24/outline';
+import { useNotify } from '../contexts/NotifyContext';
 
 function PermissionsPage() {
   const router = useRouter();
+  const { toast, confirm } = useNotify();
   const {
     permissions,
     roles,
@@ -46,9 +48,9 @@ function PermissionsPage() {
       await createRole(newRole);
       setShowRoleModal(false);
       setNewRole({ name: '', description: '', permission_ids: [] });
-      alert('Role created successfully!');
+      toast.success('Role created successfully!');
     } catch (error) {
-      alert('Failed to create role. Please try again.');
+      toast.error('Failed to create role. Please try again.');
     }
   };
 
@@ -60,19 +62,23 @@ function PermissionsPage() {
         permission_ids: editingRole.permission_ids || editingRole.permissions?.map(p => p.id) || []
       });
       setEditingRole(null);
-      alert('Role updated successfully!');
+      toast.success('Role updated successfully!');
     } catch (error) {
-      alert('Failed to update role. Please try again.');
+      toast.error('Failed to update role. Please try again.');
     }
   };
 
   const handleDeleteRole = async (roleId) => {
-    if (confirm('Are you sure you want to delete this role?')) {
+    if (await confirm('Are you sure you want to delete this role?', {
+      title: 'Delete role',
+      destructive: true,
+      confirmLabel: 'Delete',
+    })) {
       try {
         await deleteRole(roleId);
-        alert('Role deleted successfully!');
+        toast.success('Role deleted successfully!');
       } catch (error) {
-        alert('Failed to delete role. Please try again.');
+        toast.error('Failed to delete role. Please try again.');
       }
     }
   };
@@ -86,7 +92,7 @@ function PermissionsPage() {
       });
       setShowUserPermissionModal(true);
     } catch (error) {
-      alert('Failed to load user permissions.');
+      toast.error('Failed to load user permissions.');
     }
   };
 
@@ -98,9 +104,9 @@ function PermissionsPage() {
       });
       setShowUserPermissionModal(false);
       setEditingUserPermission(null);
-      alert('User permissions updated successfully!');
+      toast.success('User permissions updated successfully!');
     } catch (error) {
-      alert('Failed to update user permissions. Please try again.');
+      toast.error('Failed to update user permissions. Please try again.');
     }
   };
 

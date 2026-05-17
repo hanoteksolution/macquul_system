@@ -11,8 +11,14 @@ import {
   ArrowUpIcon,
   ArrowDownIcon
 } from '@heroicons/react/24/outline';
+import { useNotify } from '../contexts/NotifyContext';
+import MetricCardsRow from '../components/ui/MetricCardsRow';
+import PageActions from '../components/ui/PageActions';
+import { Package, AlertTriangle, XCircle, BarChart3, Plus } from 'lucide-react';
+
 
 export default function InventoryManagement() {
+  const { toast } = useNotify();
   const [stats, setStats] = useState({});
   const [transactions, setTransactions] = useState([]);
   const [products, setProducts] = useState([]);
@@ -128,10 +134,10 @@ export default function InventoryManagement() {
         notes: ''
       });
       loadInventoryData();
-      alert('Transaction added successfully!');
+      toast.success('Transaction added successfully!');
     } catch (error) {
       console.error('Failed to add transaction:', error);
-      alert('Failed to add transaction');
+      toast.error('Failed to add transaction');
     }
   };
 
@@ -164,71 +170,28 @@ export default function InventoryManagement() {
   return (
     <AdminLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
-              <CubeIcon className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-            </div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Inventory Management</h1>
-          </div>
+        <PageActions>
           <button
+            type="button"
             onClick={() => {
               setShowAddTransaction(true);
-              // Load products when opening modal if not already loaded
-              if (products.length === 0) {
-                loadProducts();
-              }
+              if (products.length === 0) loadProducts();
             }}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+            className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700"
           >
-            <PlusIcon className="h-5 w-5" />
-            Add Transaction
+            <Plus className="h-4 w-4" />
+            Add transaction
           </button>
-        </div>
+        </PageActions>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl p-6 text-white">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-blue-100">Total Products</p>
-                <p className="text-2xl font-bold">{stats.total_products || 0}</p>
-              </div>
-              <CubeIcon className="h-8 w-8 text-blue-200" />
-            </div>
-          </div>
-          
-          <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-xl p-6 text-white">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-yellow-100">Low Stock</p>
-                <p className="text-2xl font-bold">{stats.low_stock_products || 0}</p>
-              </div>
-              <ExclamationTriangleIcon className="h-8 w-8 text-yellow-200" />
-            </div>
-          </div>
-          
-          <div className="bg-gradient-to-r from-red-500 to-red-600 rounded-xl p-6 text-white">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-red-100">Out of Stock</p>
-                <p className="text-2xl font-bold">{stats.out_of_stock_products || 0}</p>
-              </div>
-              <ExclamationTriangleIcon className="h-8 w-8 text-red-200" />
-            </div>
-          </div>
-          
-          <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-xl p-6 text-white">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-green-100">Inventory Value</p>
-                <p className="text-2xl font-bold">${Number(stats.total_inventory_value || 0).toFixed(2)}</p>
-              </div>
-              <ChartBarIcon className="h-8 w-8 text-green-200" />
-            </div>
-          </div>
-        </div>
+        <MetricCardsRow
+          metrics={[
+            { label: 'Total products', value: String(stats.total_products || 0), subtitle: 'Tracked in inventory', icon: Package, accent: 'indigo' },
+            { label: 'Low stock', value: String(stats.low_stock_products || 0), subtitle: 'Below threshold', icon: AlertTriangle, accent: 'amber' },
+            { label: 'Out of stock', value: String(stats.out_of_stock_products || 0), subtitle: 'Needs restock', icon: XCircle, accent: 'rose' },
+            { label: 'Inventory value', value: `$${Number(stats.total_inventory_value || 0).toFixed(2)}`, subtitle: 'Total stock value', icon: BarChart3, accent: 'emerald' },
+          ]}
+        />
 
         {/* Recent Transactions */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">

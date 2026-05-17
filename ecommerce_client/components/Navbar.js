@@ -8,9 +8,11 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { manualLogout } from '../services/api';
 import api from '../services/api';
+import { useNotify } from '../contexts/NotifyContext';
 
 export default function Navbar() {
   const router = useRouter();
+  const { confirm } = useNotify();
   const { theme, toggleTheme } = useTheme();
   const { settings } = useSettings();
   const [user, setUser] = useState(null);
@@ -49,8 +51,16 @@ export default function Navbar() {
     }
   }, [mounted]);
 
-  const logout = () => {
-    if (confirm('Are you sure you want to logout?')) {
+  const logout = async () => {
+    if (
+      await confirm('You will be signed out of your account on this device.', {
+        title: 'Sign out?',
+        variant: 'logout',
+        destructive: true,
+        confirmLabel: 'Sign out',
+        cancelLabel: 'Cancel',
+      })
+    ) {
       manualLogout();
       setUser(null);
     }

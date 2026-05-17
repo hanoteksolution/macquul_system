@@ -44,6 +44,7 @@ LOCAL_APPS = [
     'apps.carousel',
     'apps.inventory',
     'apps.settings',
+    'apps.storefront',
     'apps.permissions',
 ]
 
@@ -83,15 +84,12 @@ WSGI_APPLICATION = 'ecommerce_backend.wsgi.application'
 # Database
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.mysql',
+        'ENGINE': 'django.db.backends.postgresql',
         'NAME': config('DB_NAME', default='ecommerce_db'),
-        'USER': config('DB_USER', default='root'),
+        'USER': config('DB_USER', default='ecom_user'),
         'PASSWORD': config('DB_PASSWORD', default=''),
         'HOST': config('DB_HOST', default='localhost'),
-        'PORT': config('DB_PORT', default='3306'),
-        'OPTIONS': {
-            'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
-        },
+        'PORT': config('DB_PORT', default='5432'),
     }
 }
 
@@ -134,7 +132,7 @@ AUTH_USER_MODEL = 'users.User'
 # Django REST Framework
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'apps.users.authentication.OptionalJWTAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
@@ -150,10 +148,11 @@ REST_FRAMEWORK = {
 
 # JWT Settings
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+  # Long-lived tokens so shoppers stay signed in; client also auto-refreshes access tokens
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=30),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=90),
     'ROTATE_REFRESH_TOKENS': True,
-    'BLACKLIST_AFTER_ROTATION': True,
+    'BLACKLIST_AFTER_ROTATION': False,
 }
 
 # CORS Settings

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getStoredTokens, isTokenExpired, clearTokens } from '../services/api';
+import { getStoredTokens, isTokenExpired, clearTokens, ensureValidAccessToken } from '../services/api';
 
 export const useAuth = () => {
   const [user, setUser] = useState(null);
@@ -10,24 +10,26 @@ export const useAuth = () => {
     checkAuthStatus();
   }, []);
 
-  const checkAuthStatus = () => {
+  const checkAuthStatus = async () => {
     try {
-      const { accessToken, refreshToken, user: storedUser } = getStoredTokens();
-      
-      if (accessToken && !isTokenExpired(accessToken)) {
-        // Token is valid
+      const { refreshToken, user: storedUser } = getStoredTokens();
+
+      if (refreshToken && !isTokenExpired(refreshToken, 0)) {
+        await ensureValidAccessToken();
         setUser(storedUser);
         setIsAuthenticated(true);
-      } else if (refreshToken) {
-        // Access token expired but refresh token exists
-        // The API interceptor will handle token refresh automatically
-        setUser(storedUser);
-        setIsAuthenticated(true);
-      } else {
-        // No valid tokens
-        setUser(null);
-        setIsAuthenticated(false);
+        return;
       }
+
+      const { accessToken } = getStoredTokens();
+      if (accessToken && !isTokenExpired(accessToken)) {
+        setUser(storedUser);
+        setIsAuthenticated(true);
+        return;
+      }
+
+      setUser(null);
+      setIsAuthenticated(false);
     } catch (error) {
       console.error('Error checking auth status:', error);
       setUser(null);

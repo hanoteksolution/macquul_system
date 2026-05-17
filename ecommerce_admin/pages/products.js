@@ -2,8 +2,17 @@ import AdminLayout from '../components/AdminLayout';
 import api from '../services/api';
 import { useEffect, useState } from 'react';
 import { PlusIcon, PencilIcon, TrashIcon, XMarkIcon, MagnifyingGlassIcon, FunnelIcon, ArrowPathIcon, PhotoIcon } from '@heroicons/react/24/outline';
+import { useNotify } from '../contexts/NotifyContext';
+import MetricCardsRow from '../components/ui/MetricCardsRow';
+import PageActions from '../components/ui/PageActions';
+import DataTable from '../components/ui/DataTable';
+import TablePagination from '../components/ui/TablePagination';
+import { Card } from '../components/ui/Card';
+import { Package, Layers, CheckCircle, XCircle, Plus } from 'lucide-react';
+
 
 export default function AdminProducts() {
+  const { toast, confirm } = useNotify();
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [search, setSearch] = useState('');
@@ -95,29 +104,138 @@ export default function AdminProducts() {
       closeModal();
       load();
     } catch (err) {
-      alert('Failed to save product');
+      toast.error('Failed to save product');
     }
   };
 
   const remove = async (id) => {
-    if (!confirm('Are you sure you want to delete this product? This action cannot be undone.')) return;
+    if (!(await confirm('Are you sure you want to delete this product? This action cannot be undone.', {
+      title: 'Delete product',
+      destructive: true,
+      confirmLabel: 'Delete',
+    }))) return;
     try {
       await api.delete(`/products/${id}/`);
       load();
     } catch (err) {
-      alert('Failed to delete product');
+      toast.error('Failed to delete product');
     }
   };
 
   const filtered = products.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase()) ||
-                         p.description.toLowerCase().includes(search.toLowerCase());
+                         (p.description || '').toLowerCase().includes(search.toLowerCase());
     const matchesCategory = !categoryFilter || p.category?.id == categoryFilter;
     return matchesSearch && matchesCategory;
   });
 
-  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / itemsPerPage) || 1);
   const paginatedProducts = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, categoryFilter]);
+
+  const productColumns = [
+    {
+      key: 'index',
+      header: '#',
+      render: (_, i) => (currentPage - 1) * itemsPerPage + i + 1,
+    },
+    {
+      key: 'product',
+      header: 'Product',
+      render: (p) => (
+        <div className="flex min-w-[200px] items-center gap-3">
+          <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-100 dark:border-slate-700 dark:bg-slate-800">
+            {p.image_url ? (
+              <img src={p.image_url} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center">
+                <PhotoIcon className="h-5 w-5 text-slate-400" />
+              </div>
+            )}
+          </div>
+          <div>
+            <p className="font-semibold text-slate-900 dark:text-white">{p.name}</p>
+            <p className="line-clamp-1 text-xs text-slate-500">{p.description}</p>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'category',
+      header: 'Category',
+      render: (p) => (
+        <span className="rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-medium text-brand-700 dark:bg-brand-950 dark:text-brand-300">
+          {p.category?.name || 'Uncategorized'}
+        </span>
+      ),
+    },
+    {
+      key: 'price',
+      header: 'Price',
+      render: (p) => <span className="font-semibold">${Number(p.price || 0).toFixed(2)}</span>,
+    },
+    {
+      key: 'stock',
+      header: 'Stock',
+      render: (p) => (
+        <span
+          className={
+            p.stock > 10
+              ? 'text-emerald-600'
+              : p.stock > 0
+                ? 'text-amber-600'
+                : 'text-rose-600'
+          }
+        >
+          {p.stock} units
+        </span>
+      ),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: (p) => (
+        <span
+          className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
+            p.stock > 10
+              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300'
+              : p.stock > 0
+                ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'
+                : 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300'
+          }`}
+        >
+          {p.stock > 10 ? 'In stock' : p.stock > 0 ? 'Low stock' : 'Out of stock'}
+        </span>
+      ),
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      render: (p) => (
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => openModal(p)}
+            className="rounded-lg p-2 text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-950/50"
+            title="Edit"
+          >
+            <PencilIcon className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => remove(p.id)}
+            className="rounded-lg p-2 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50"
+            title="Delete"
+          >
+            <TrashIcon className="h-4 w-4" />
+          </button>
+        </div>
+      ),
+    },
+  ];
 
   if (loading && products.length === 0) {
     return (
@@ -134,271 +252,110 @@ export default function AdminProducts() {
 
   return (
     <AdminLayout>
-      <div className="space-y-8">
-        {/* Header Section */}
-        <div className="bg-gradient-to-r from-blue-500 via-purple-500 to-blue-600 rounded-2xl p-8 text-white relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-r from-black/20 to-transparent"></div>
-          <div className="relative">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold mb-2">Products Management</h1>
-                <p className="text-blue-100 text-lg">Manage your product catalog and inventory</p>
-              </div>
-              <button
-                onClick={() => openModal()}
-                className="flex items-center gap-3 bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-200 hover:scale-105 shadow-lg"
-              >
-                <PlusIcon className="h-5 w-5" />
-                Add Product
-              </button>
-            </div>
-          </div>
-          <div className="absolute -top-4 -right-4 w-24 h-24 bg-white/10 rounded-full blur-2xl"></div>
-          <div className="absolute -bottom-4 -left-4 w-32 h-32 bg-white/5 rounded-full blur-3xl"></div>
-        </div>
+      <div className="space-y-6">
+        <PageActions>
+          <button
+            type="button"
+            onClick={() => openModal()}
+            className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
+          >
+            <Plus className="h-4 w-4" />
+            Add product
+          </button>
+        </PageActions>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-800 dark:to-gray-700/50 rounded-2xl shadow-lg border border-gray-200/50 dark:border-gray-700/50 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Products</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-white mt-2">{products.length}</p>
-              </div>
-              <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl shadow-lg">
-                <PhotoIcon className="h-6 w-6 text-white" />
-              </div>
-            </div>
-          </div>
+        <MetricCardsRow
+          metrics={[
+            {
+              label: 'Total products',
+              numericValue: products.length,
+              value: String(products.length),
+              subtitle: 'In catalog',
+              icon: Package,
+              accent: 'indigo',
+            },
+            {
+              label: 'Categories',
+              numericValue: categories.length,
+              value: String(categories.length),
+              subtitle: 'Product categories',
+              icon: Layers,
+              accent: 'violet',
+            },
+            {
+              label: 'In stock',
+              numericValue: products.filter((p) => p.stock > 0).length,
+              value: String(products.filter((p) => p.stock > 0).length),
+              subtitle: 'Available to sell',
+              icon: CheckCircle,
+              accent: 'emerald',
+            },
+            {
+              label: 'Out of stock',
+              numericValue: products.filter((p) => p.stock === 0).length,
+              value: String(products.filter((p) => p.stock === 0).length),
+              subtitle: 'Needs restock',
+              icon: XCircle,
+              accent: 'rose',
+            },
+          ]}
+        />
 
-          <div className="bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-800 dark:to-gray-700/50 rounded-2xl shadow-lg border border-gray-200/50 dark:border-gray-700/50 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Categories</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-white mt-2">{categories.length}</p>
-              </div>
-              <div className="p-3 bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl shadow-lg">
-                <FunnelIcon className="h-6 w-6 text-white" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-800 dark:to-gray-700/50 rounded-2xl shadow-lg border border-gray-200/50 dark:border-gray-700/50 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">In Stock</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-white mt-2">{products.filter(p => p.stock > 0).length}</p>
-              </div>
-              <div className="p-3 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl shadow-lg">
-                <ArrowPathIcon className="h-6 w-6 text-white" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-800 dark:to-gray-700/50 rounded-2xl shadow-lg border border-gray-200/50 dark:border-gray-700/50 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Out of Stock</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-white mt-2">{products.filter(p => p.stock === 0).length}</p>
-              </div>
-              <div className="p-3 bg-gradient-to-br from-red-500 to-red-600 rounded-2xl shadow-lg">
-                <XMarkIcon className="h-6 w-6 text-white" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Filters and Search */}
-        <div className="bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-800 dark:to-gray-700/50 rounded-2xl shadow-lg border border-gray-200/50 dark:border-gray-700/50 p-6">
-          <div className="flex flex-col lg:flex-row gap-4">
-            <div className="flex-1 relative">
-              <MagnifyingGlassIcon className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 dark:text-gray-500" />
+        <div className="admin-toolbar">
+          <div className="flex flex-col gap-4 lg:flex-row">
+            <div className="relative flex-1">
+              <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
                 placeholder="Search products by name, description..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-12 pr-4 py-3 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-900 dark:text-white rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 shadow-sm"
+                className="admin-input pl-10"
               />
             </div>
-            <div className="relative">
-              <FunnelIcon className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 dark:text-gray-500" />
+            <div className="relative min-w-[12rem]">
+              <FunnelIcon className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
               <select
                 value={categoryFilter}
                 onChange={(e) => setCategoryFilter(e.target.value)}
-                className="pl-12 pr-4 py-3 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-900 dark:text-white rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 shadow-sm min-w-48"
+                className="admin-input pl-10"
               >
-                <option value="">All Categories</option>
-                {categories.map(c => (
+                <option value="">All categories</option>
+                {categories.map((c) => (
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>
             </div>
-            <button
-              onClick={load}
-              className="px-4 py-3 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-xl transition-all duration-200 hover:scale-105"
-            >
+            <button type="button" onClick={load} className="admin-input flex w-12 items-center justify-center px-0" title="Refresh">
               <ArrowPathIcon className="h-5 w-5" />
             </button>
           </div>
-
-          <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
-            <div className="text-sm text-gray-600 dark:text-gray-400">
-              Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filtered.length)} of {filtered.length} products
-            </div>
-            <div className="text-sm text-gray-500 dark:text-gray-400">
-              Page {currentPage} of {totalPages}
-            </div>
-          </div>
         </div>
 
-        {/* Products Table */}
-        <div className="bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-800 dark:to-gray-700/50 rounded-2xl shadow-lg border border-gray-200/50 dark:border-gray-700/50 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-600">
-                <tr>
-                  <th className="text-left py-4 px-6 font-bold text-gray-900 dark:text-white">#</th>
-                  <th className="text-left py-4 px-6 font-bold text-gray-900 dark:text-white">Product</th>
-                  <th className="text-left py-4 px-6 font-bold text-gray-900 dark:text-white">Category</th>
-                  <th className="text-left py-4 px-6 font-bold text-gray-900 dark:text-white">Price</th>
-                  <th className="text-left py-4 px-6 font-bold text-gray-900 dark:text-white">Stock</th>
-                  <th className="text-left py-4 px-6 font-bold text-gray-900 dark:text-white">Status</th>
-                  <th className="text-left py-4 px-6 font-bold text-gray-900 dark:text-white">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
-                {paginatedProducts.map((p, idx) => (
-                  <tr key={p.id} className="group hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-all duration-200">
-                    <td className="py-4 px-6 text-sm font-medium text-gray-900 dark:text-white">
-                      {((currentPage - 1) * itemsPerPage) + idx + 1}
-                    </td>
-                    <td className="py-4 px-6">
-                      <div className="flex items-center gap-4">
-                        <div className="relative">
-                          <div className="w-16 h-16 rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-700 border-2 border-gray-200 dark:border-gray-600 group-hover:scale-110 transition-transform duration-200">
-                            {p.image_url ? (
-                              <img src={p.image_url} alt={p.name} className="w-full h-full object-cover" />
-                            ) : (
-                              <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-600 dark:to-gray-500 flex items-center justify-center">
-                                <PhotoIcon className="h-6 w-6 text-gray-400 dark:text-gray-500" />
-                              </div>
-                            )}
-                          </div>
-                          {p.stock === 0 && (
-                            <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
-                              <XMarkIcon className="h-3 w-3 text-white" />
-                            </div>
-                          )}
-                        </div>
-                        <div>
-                          <div className="font-semibold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200">
-                            {p.name}
-                          </div>
-                          <div className="text-sm text-gray-500 dark:text-gray-400 line-clamp-1">
-                            {p.description}
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-4 px-6 text-sm font-medium text-gray-900 dark:text-white">
-                      <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-medium">
-                        {p.category?.name || 'Uncategorized'}
-                      </span>
-                    </td>
-                    <td className="py-4 px-6 text-sm font-bold text-gray-900 dark:text-white">
-                      ${Number(p.price || 0).toFixed(2)}
-                    </td>
-                    <td className="py-4 px-6">
-                      <div className="flex items-center gap-2">
-                        <span className={`text-sm font-medium ${
-                          p.stock > 10 ? 'text-green-600 dark:text-green-400' :
-                          p.stock > 0 ? 'text-yellow-600 dark:text-yellow-400' :
-                          'text-red-600 dark:text-red-400'
-                        }`}>
-                          {p.stock}
-                        </span>
-                        <span className="text-xs text-gray-500 dark:text-gray-400">units</span>
-                      </div>
-                    </td>
-                    <td className="py-4 px-6">
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        p.stock > 10 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
-                        p.stock > 0 ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
-                        'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                      }`}>
-                        {p.stock > 10 ? 'In Stock' : p.stock > 0 ? 'Low Stock' : 'Out of Stock'}
-                      </span>
-                    </td>
-                    <td className="py-4 px-6">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => openModal(p)}
-                          className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-all duration-200 hover:scale-110"
-                          title="Edit Product"
-                        >
-                          <PencilIcon className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => remove(p.id)}
-                          className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all duration-200 hover:scale-110"
-                          title="Delete Product"
-                        >
-                          <TrashIcon className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between p-6 border-t border-gray-200 dark:border-gray-600">
-              <button
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Previous
-              </button>
-
-              <div className="flex gap-2">
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  const page = i + 1;
-                  return (
-                    <button
-                      key={page}
-                      onClick={() => setCurrentPage(page)}
-                      className={`px-3 py-2 text-sm rounded-xl transition-all duration-200 ${
-                        page === currentPage
-                          ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg'
-                          : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300'
-                      }`}
-                    >
-                      {page}
-                    </button>
-                  );
-                })}
-              </div>
-
-              <button
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className="px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Next
-              </button>
-            </div>
-          )}
-        </div>
+        <Card className="overflow-hidden p-0">
+          <DataTable
+            columns={productColumns}
+            data={paginatedProducts}
+            loading={loading}
+            className="border-0 rounded-none"
+            emptyMessage="No products match your filters."
+            getRowKey={(row) => row.id}
+            footer={
+              <TablePagination
+                page={currentPage}
+                totalPages={totalPages}
+                totalItems={filtered.length}
+                pageSize={itemsPerPage}
+                onPageChange={setCurrentPage}
+              />
+            }
+          />
+        </Card>
 
         {/* Enhanced Modal */}
         {showModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl border border-slate-200 dark:border-slate-700 w-full max-w-2xl max-h-[90vh] overflow-hidden">
               {/* Modal Header */}
               <div className="bg-gradient-to-r from-blue-500 via-purple-500 to-blue-600 px-6 py-4 text-white">
                 <div className="flex items-center justify-between">
@@ -549,7 +506,7 @@ export default function AdminProducts() {
                   </button>
                   <button
                     onClick={save}
-                    className="px-6 py-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-xl font-semibold transition-all duration-200 hover:scale-105 shadow-lg"
+                    className="rounded-xl bg-brand-600 px-6 py-2 font-semibold text-white transition-colors hover:bg-brand-700"
                   >
                     {editingId ? 'Update Product' : 'Create Product'}
                   </button>

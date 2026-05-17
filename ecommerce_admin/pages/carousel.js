@@ -3,9 +3,17 @@ import { useRouter } from 'next/router';
 import AdminLayout from '../components/AdminLayout';
 import api from '../services/api';
 import { PlusIcon, PencilIcon, TrashIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
+import { useNotify } from '../contexts/NotifyContext';
+import MetricCardsRow from '../components/ui/MetricCardsRow';
+import PageActions from '../components/ui/PageActions';
+import DataTable from '../components/ui/DataTable';
+import { Card } from '../components/ui/Card';
+import { Images, Eye, EyeOff, Plus } from 'lucide-react';
+
 
 export default function CarouselManagement() {
   const router = useRouter();
+  const { toast, confirm } = useNotify();
   const [slides, setSlides] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -69,7 +77,7 @@ export default function CarouselManagement() {
       resetForm();
       loadSlides();
     } catch (error) {
-      alert('Failed to save slide: ' + (error.response?.data?.detail || error.message));
+      toast.error('Failed to save slide: ' + (error.response?.data?.detail || error.message));
     }
   };
 
@@ -91,12 +99,16 @@ export default function CarouselManagement() {
   };
 
   const handleDelete = async (id) => {
-    if (confirm('Are you sure you want to delete this slide?')) {
+    if (await confirm('Are you sure you want to delete this slide?', {
+      title: 'Delete slide',
+      destructive: true,
+      confirmLabel: 'Delete',
+    })) {
       try {
         await api.delete(`/carousel/slides/${id}/`);
         loadSlides();
       } catch (error) {
-        alert('Failed to delete slide');
+        toast.error('Failed to delete slide');
       }
     }
   };
@@ -106,7 +118,7 @@ export default function CarouselManagement() {
       await api.patch(`/carousel/slides/${slide.id}/`, { is_active: !slide.is_active });
       loadSlides();
     } catch (error) {
-      alert('Failed to update slide status');
+      toast.error('Failed to update slide status');
     }
   };
 
@@ -145,16 +157,26 @@ export default function CarouselManagement() {
 
   return (
     <AdminLayout>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Carousel Management</h1>
-        <button
-          onClick={openCreateModal}
-          className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg font-medium"
-        >
-          <PlusIcon className="h-5 w-5" />
-          Add New Slide
-        </button>
-      </div>
+      <div className="space-y-6">
+        <PageActions>
+          <button
+            type="button"
+            onClick={openCreateModal}
+            className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700"
+          >
+            <Plus className="h-4 w-4" />
+            Add slide
+          </button>
+        </PageActions>
+
+        <MetricCardsRow
+          metrics={[
+            { label: 'Total slides', value: String(slides.length), subtitle: 'Carousel items', icon: Images, accent: 'indigo' },
+            { label: 'Active', value: String(slides.filter((s) => s.is_active).length), subtitle: 'Visible on storefront', icon: Eye, accent: 'emerald' },
+            { label: 'Inactive', value: String(slides.filter((s) => !s.is_active).length), subtitle: 'Hidden slides', icon: EyeOff, accent: 'amber' },
+            { label: 'Max recommended', value: '5', subtitle: 'Homepage slots', icon: Images, accent: 'violet' },
+          ]}
+        />
 
         {loading ? (
           <div className="text-center py-8">Loading slides...</div>
@@ -356,6 +378,7 @@ export default function CarouselManagement() {
           </div>
         </div>
       )}
+      </div>
     </AdminLayout>
   );
 }

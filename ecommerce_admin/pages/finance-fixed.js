@@ -10,8 +10,14 @@ import {
   DocumentTextIcon,
   PlusIcon
 } from '@heroicons/react/24/outline';
+import { useNotify } from '../contexts/NotifyContext';
+import MetricCardsRow from '../components/ui/MetricCardsRow';
+import PageActions from '../components/ui/PageActions';
+import { DollarSign, TrendingUp, Calendar, Receipt, FileText } from 'lucide-react';
+
 
 export default function FinanceManagement() {
+  const { toast } = useNotify();
   const [stats, setStats] = useState({});
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -55,10 +61,10 @@ export default function FinanceManagement() {
         end_date: ''
       });
       loadFinancialData();
-      alert('Report generated successfully!');
+      toast.success('Report generated successfully!');
     } catch (error) {
       console.error('Failed to generate report:', error);
-      alert('Failed to generate report');
+      toast.error('Failed to generate report');
     }
   };
 
@@ -75,104 +81,34 @@ export default function FinanceManagement() {
   return (
     <AdminLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center">
-              <CurrencyDollarIcon className="h-6 w-6 text-green-600 dark:text-green-400" />
-            </div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Finance Management</h1>
-          </div>
+        <PageActions>
           <button
+            type="button"
             onClick={() => setShowGenerateReport(true)}
-            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+            className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700"
           >
-            <PlusIcon className="h-5 w-5" />
-            Generate Report
+            <FileText className="h-4 w-4" />
+            Generate report
           </button>
-        </div>
+        </PageActions>
 
-        {/* Sales Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-xl p-6 text-white">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-green-100">Today's Sales</p>
-                <p className="text-2xl font-bold">${Number(stats.today_sales || 0).toFixed(2)}</p>
-              </div>
-              <TrendingUpIcon className="h-8 w-8 text-green-200" />
-            </div>
-          </div>
-          
-          <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl p-6 text-white">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-blue-100">This Month</p>
-                <p className="text-2xl font-bold">${Number(stats.this_month_sales || 0).toFixed(2)}</p>
-              </div>
-              <ChartBarIcon className="h-8 w-8 text-blue-200" />
-            </div>
-          </div>
-          
-          <div className="bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl p-6 text-white">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-purple-100">This Year</p>
-                <p className="text-2xl font-bold">${Number(stats.this_year_sales || 0).toFixed(2)}</p>
-              </div>
-              <TrendingUpIcon className="h-8 w-8 text-purple-200" />
-            </div>
-          </div>
-          
-          <div className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl p-6 text-white">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-orange-100">Avg Order Value</p>
-                <p className="text-2xl font-bold">${Number(stats.average_order_value || 0).toFixed(2)}</p>
-              </div>
-              <CurrencyDollarIcon className="h-8 w-8 text-orange-200" />
-            </div>
-          </div>
-        </div>
+        <MetricCardsRow
+          metrics={[
+            { label: "Today's sales", value: `$${Number(stats.today_sales || 0).toFixed(2)}`, subtitle: 'Revenue today', icon: DollarSign, accent: 'emerald' },
+            { label: 'This month', value: `$${Number(stats.this_month_sales || 0).toFixed(2)}`, subtitle: 'Monthly revenue', icon: TrendingUp, accent: 'indigo' },
+            { label: 'This year', value: `$${Number(stats.this_year_sales || 0).toFixed(2)}`, subtitle: 'Year to date', icon: Calendar, accent: 'violet' },
+            { label: 'Avg order value', value: `$${Number(stats.average_order_value || 0).toFixed(2)}`, subtitle: 'Per order', icon: Receipt, accent: 'amber' },
+          ]}
+        />
 
-        {/* Order Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 dark:text-gray-400">Total Orders</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.total_orders || 0}</p>
-              </div>
-              <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
-                <ChartBarIcon className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 dark:text-gray-400">Pending Orders</p>
-                <p className="text-3xl font-bold text-yellow-600">{stats.pending_orders || 0}</p>
-              </div>
-              <div className="w-12 h-12 bg-yellow-100 dark:bg-yellow-900 rounded-lg flex items-center justify-center">
-                <CalendarIcon className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 dark:text-gray-400">Completed Orders</p>
-                <p className="text-3xl font-bold text-green-600">{stats.completed_orders || 0}</p>
-              </div>
-              <div className="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center">
-                <TrendingUpIcon className="h-6 w-6 text-green-600 dark:text-green-400" />
-              </div>
-            </div>
-          </div>
-        </div>
+        <MetricCardsRow
+          columns={3}
+          metrics={[
+            { label: 'Total orders', value: String(stats.total_orders || 0), subtitle: 'All orders', icon: Receipt, accent: 'indigo' },
+            { label: 'Pending orders', value: String(stats.pending_orders || 0), subtitle: 'Awaiting fulfillment', icon: Calendar, accent: 'amber' },
+            { label: 'Completed orders', value: String(stats.completed_orders || 0), subtitle: 'Delivered', icon: TrendingUp, accent: 'emerald' },
+          ]}
+        />
 
         {/* Financial Reports */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">

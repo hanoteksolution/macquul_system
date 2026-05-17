@@ -19,8 +19,14 @@ class Command(BaseCommand):
             admin.save(update_fields=['is_admin'])
             self.stdout.write(self.style.SUCCESS('Created default admin: admin@example.com / admin123'))
 
-        electronics, _ = Category.objects.get_or_create(name='Electronics', defaults={'description': 'Electronic devices'})
-        stationery, _ = Category.objects.get_or_create(name='Stationery', defaults={'description': 'Stationery items'})
+        electronics, _ = Category.objects.get_or_create(
+            name='Electronics',
+            defaults={'description': 'Electronic devices', 'icon': '📱'},
+        )
+        stationery, _ = Category.objects.get_or_create(
+            name='Stationery',
+            defaults={'description': 'Stationery items', 'icon': '📝'},
+        )
 
         # product tuples: (category, name, description, price, stock, image_url)
         products = [

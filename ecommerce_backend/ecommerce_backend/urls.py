@@ -5,8 +5,12 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from rest_framework.routers import DefaultRouter
 from apps.users.views import UserProfileView
-from apps.products.views import category_list
+from apps.products.views import CategoryViewSet
+
+category_router = DefaultRouter()
+category_router.register(r'', CategoryViewSet, basename='category')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -18,10 +22,11 @@ urlpatterns = [
     path('api/carousel/', include('apps.carousel.urls')),
     path('api/inventory/', include('apps.inventory.urls')),
     path('api/settings/', include('apps.settings.urls')),
+    path('api/storefront/', include('apps.storefront.urls')),
     path('api/permissions/', include('apps.permissions.urls')),
     # Direct endpoints as specified
     path('api/users/profile', UserProfileView.as_view(), name='user-profile-direct'),
-    path('api/categories/', category_list, name='category-list-direct'),
+    path('api/categories/', include(category_router.urls)),
 ]
 
 # Serve media files during development

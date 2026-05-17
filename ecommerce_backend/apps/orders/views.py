@@ -1,6 +1,12 @@
 from rest_framework import viewsets, permissions, status
+from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db import transaction
+from django.db.models import Sum, F, Count
+from django.db.models.functions import TruncDate
+from django.utils import timezone
+from django.conf import settings
+from datetime import timedelta
 from .models import Order, OrderItem
 from apps.products.models import Product
 from apps.stock.models import StockMovement
@@ -61,3 +67,128 @@ class OrderViewSet(viewsets.ModelViewSet):
         instance.status = status_value
         instance.save(update_fields=['status'])
         return Response(self.get_serializer(instance).data)
+
+    @action(detail=False, methods=['get'], url_path='dashboard')
+    def dashboard(self, request):
+        """Admin dashboard: recent orders, top sellers, revenue series."""
+        if not getattr(request.user, 'is_admin', False):
+            return Response({'detail': 'Admin only.'}, status=status.HTTP_403_FORBIDDEN)
+
+        recent_qs = (
+            Order.objects.select_related('user')
+            .prefetch_related('items__product')
+            .order_by('-created_at')[:10]
+        )
+        recent_orders = []
+        for order in recent_qs:
+            first_item = order.items.first()
+            recent_orders.append({
+                'id': order.id,
+                'customer_name': order.customer_name or (order.user.get_full_name() if order.user else 'Guest'),
+                'customer_email': order.customer_email or (order.user.email if order.user else ''),
+                'total_price': float(order.total_price),
+                'status': order.status,
+                'created_at': order.created_at.isoformat(),
+                'item_count': order.items.count(),
+                'preview': first_item.product.name if first_item else '—',
+            })
+
+        top_qs = (
+            OrderItem.objects.values('product_id', 'product__name', 'product__image')
+            .annotate(
+                units_sold=Sum('quantity'),
+                revenue=Sum(F('quantity') * F('price')),
+            )
+            .order_by('-units_sold')[:10]
+        )
+        top_products = []
+        for row in top_qs:
+            image_url = None
+            img = row.get('product__image')
+            if img:
+                image_url = request.build_absolute_uri(f"{settings.MEDIA_URL}{img}")
+            top_products.append({
+                'product_id': row['product_id'],
+                'name': row['product__name'],
+                'image_url': image_url,
+                'units_sold': row['units_sold'] or 0,
+                'revenue': float(row['revenue'] or 0),
+            })
+
+        today = timezone.now().date()
+        week_start = today - timedelta(days=6)
+        daily = (
+            Order.objects.filter(created_at__date__gte=week_start)
+            .annotate(day=TruncDate('created_at'))
+            .values('day')
+            .annotate(revenue=Sum('total_price'), orders=Count('id'))
+            .order_by('day')
+        )
+        daily_map = {d['day']: d for d in daily}
+        revenue_week = []
+        for i in range(7):
+            d = week_start + timedelta(days=i)
+            entry = daily_map.get(d, {})
+            revenue_week.append({
+                'name': d.strftime('%a'),
+                'date': d.isoformat(),
+                'revenue': float(entry.get('revenue') or 0),
+                'orders': entry.get('orders') or 0,
+            })
+
+        month_start = today - timedelta(days=27)
+        weekly = (
+            Order.objects.filter(created_at__date__gte=month_start)
+            .annotate(day=TruncDate('created_at'))
+            .values('day')
+            .annotate(revenue=Sum('total_price'), orders=Count('id'))
+        )
+        revenue_month = []
+        for w in range(4):
+            w_start = month_start + timedelta(days=w * 7)
+            w_end = w_start + timedelta(days=6)
+            rev = sum(
+                float(x['revenue'] or 0)
+                for x in weekly
+                if x['day'] and w_start <= x['day'] <= w_end
+            )
+            ord_count = sum(
+                x['orders'] or 0
+                for x in weekly
+                if x['day'] and w_start <= x['day'] <= w_end
+            )
+            revenue_month.append({
+                'name': f'W{w + 1}',
+                'revenue': rev,
+                'orders': ord_count,
+            })
+
+        cat_sales = (
+            OrderItem.objects.filter(product__category__isnull=False)
+            .values('product__category__name')
+            .annotate(value=Sum('quantity'))
+            .order_by('-value')[:6]
+        )
+        category_breakdown = [
+            {'name': c['product__category__name'] or 'Other', 'value': c['value'] or 0}
+            for c in cat_sales
+        ]
+
+        products_count = Product.objects.count()
+        orders_count = Order.objects.count()
+        total_revenue = float(
+            Order.objects.aggregate(t=Sum('total_price'))['t'] or 0
+        )
+
+        return Response({
+            'stats': {
+                'products': products_count,
+                'orders': orders_count,
+                'revenue': total_revenue,
+            },
+            'recent_orders': recent_orders,
+            'top_products': top_products,
+            'revenue_week': revenue_week,
+            'revenue_month': revenue_month,
+            'category_breakdown': category_breakdown,
+        })
