@@ -10,7 +10,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         settings = SiteSettings.get_settings()
-        settings.site_name = 'Macquul'
+        settings.site_name = 'Safari Ecommerce'
         if not getattr(settings, 'promo_code', None):
             settings.promo_code = 'WELCOME15'
         if not getattr(settings, 'default_locale', None):

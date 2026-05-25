@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, RotateCcw, SlidersHorizontal, Star, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Category } from '@/lib/types';
+import { buildCategoryTree } from '@/lib/category-utils';
 import type { ShopFilterState } from './types';
 import { Button } from '@/components/ui/button';
 
@@ -109,21 +110,38 @@ function FilterPanelContent({
             >
               All products
             </button>
-            {categories.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => onCategory(String(c.id))}
-                className={cn(
-                  'rounded-xl px-3 py-2.5 text-left text-sm transition',
-                  String(categoryId) === String(c.id)
-                    ? 'bg-gradient-to-r from-brand-600 to-violet-600 font-semibold text-white shadow-glow-sm'
-                    : 'hover:bg-slate-100 dark:hover:bg-zinc-800'
-                )}
-              >
-                {c.name}
-                <span className="ml-2 text-xs opacity-70">({c.product_count ?? 0})</span>
-              </button>
+            {buildCategoryTree(categories).map((parent) => (
+              <div key={parent.id} className="space-y-1">
+                <button
+                  type="button"
+                  onClick={() => onCategory(String(parent.id))}
+                  className={cn(
+                    'w-full rounded-xl px-3 py-2.5 text-left text-sm font-medium transition',
+                    String(categoryId) === String(parent.id)
+                      ? 'bg-gradient-to-r from-brand-600 to-violet-600 font-semibold text-white shadow-glow-sm'
+                      : 'hover:bg-slate-100 dark:hover:bg-zinc-800'
+                  )}
+                >
+                  {parent.name}
+                  <span className="ml-2 text-xs opacity-70">({parent.product_count ?? 0})</span>
+                </button>
+                {(parent.children || []).map((sub) => (
+                  <button
+                    key={sub.id}
+                    type="button"
+                    onClick={() => onCategory(String(sub.id))}
+                    className={cn(
+                      'ml-3 w-[calc(100%-0.75rem)] rounded-lg px-3 py-2 text-left text-sm transition',
+                      String(categoryId) === String(sub.id)
+                        ? 'bg-gradient-to-r from-brand-600 to-violet-600 font-semibold text-white shadow-glow-sm'
+                        : 'text-slate-600 hover:bg-slate-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
+                    )}
+                  >
+                    {sub.name}
+                    <span className="ml-2 text-xs opacity-70">({sub.product_count ?? 0})</span>
+                  </button>
+                ))}
+              </div>
             ))}
           </div>
         </FilterGroup>

@@ -14,8 +14,9 @@ export const useSettings = () => {
 export const SettingsProvider = ({ children }) => {
   const [settings, setSettings] = useState({
     // Default settings
-    siteName: 'CIGAN E-Store',
-    siteDescription: 'Your premier destination for electronics and stationery',
+    siteName: 'Safari Ecommerce',
+    siteDescription:
+      'Premium curated commerce — exceptional products, trusted delivery, and a world-class shopping experience.',
     primaryColor: '#3B82F6',
     secondaryColor: '#8B5CF6',
     accentColor: '#F59E0B',
@@ -113,17 +114,28 @@ export const SettingsProvider = ({ children }) => {
         '--accent-color': accentColor
       });
       
-      // Update document title
+      // Update document title & favicon
       if (settingsData.siteName) {
         document.title = settingsData.siteName;
       }
-      
-      // Update meta description
+
       const metaDescription = document.querySelector('meta[name="description"]');
       if (metaDescription && settingsData.siteDescription) {
         metaDescription.setAttribute('content', settingsData.siteDescription);
       }
-      
+
+      let favicon =
+        document.querySelector("link[rel='icon']") ||
+        document.querySelector("link[rel*='icon']");
+      if (!favicon) {
+        favicon = document.createElement('link');
+        favicon.rel = 'icon';
+        document.head.appendChild(favicon);
+      }
+      const faviconHref = settingsData.favicon || '/favicon.svg';
+      favicon.href = faviconHref;
+      favicon.type = faviconHref.endsWith('.svg') ? 'image/svg+xml' : 'image/png';
+
       console.log('Color settings applied to CSS variables');
     }
   };

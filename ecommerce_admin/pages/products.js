@@ -9,6 +9,7 @@ import DataTable from '../components/ui/DataTable';
 import TablePagination from '../components/ui/TablePagination';
 import { Card } from '../components/ui/Card';
 import { Package, Layers, CheckCircle, XCircle, Plus } from 'lucide-react';
+import { buildCategoryTree, flattenCategoryTree, getAssignableCategories } from '../lib/categoryUtils';
 
 
 export default function AdminProducts() {
@@ -29,8 +30,9 @@ export default function AdminProducts() {
     try {
       setLoading(true);
       const [p, c] = await Promise.all([api.get('/products/'), api.get('/categories/')]);
-      setProducts(p.data);
-      setCategories(c.data);
+      setProducts(Array.isArray(p.data) ? p.data : p.data.results || []);
+      const catList = Array.isArray(c.data) ? c.data : c.data.results || [];
+      setCategories(catList);
     } catch (err) {
       console.error('Failed to load data');
     } finally {
@@ -121,6 +123,9 @@ export default function AdminProducts() {
       toast.error('Failed to delete product');
     }
   };
+
+  const assignableCategories = getAssignableCategories(categories);
+  const filterCategoryRows = flattenCategoryTree(buildCategoryTree(categories));
 
   const filtered = products.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -321,8 +326,10 @@ export default function AdminProducts() {
                 className="admin-input pl-10"
               >
                 <option value="">All categories</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
+                {filterCategoryRows.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.depth > 0 ? `${'— '.repeat(c.depth)}${c.name}` : c.name}
+                  </option>
                 ))}
               </select>
             </div>
@@ -403,9 +410,9 @@ export default function AdminProducts() {
                         onChange={(e) => setForm({ ...form, category_id: e.target.value })}
                         className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-900 dark:text-white rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                       >
-                        <option value="">Select Category</option>
-                        {categories.map(c => (
-                          <option key={c.id} value={c.id}>{c.name}</option>
+                        <option value="">Select subcategory</option>
+                        {assignableCategories.map((c) => (
+                          <option key={c.id} value={c.id}>{c.label}</option>
                         ))}
                       </select>
                     </div>

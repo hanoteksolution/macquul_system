@@ -28,19 +28,22 @@ function useCountdown(endAt?: string) {
   return time;
 }
 
-function DigitBox({ value, label }: { value: number; label: string }) {
+function DigitBox({ value, label, compact }: { value: number; label: string; compact?: boolean }) {
   const display = String(value).padStart(2, '0');
 
   return (
     <motion.div
-      className="relative flex min-w-[4.25rem] flex-col items-center overflow-hidden rounded-2xl border border-white/15 bg-white/[0.07] px-3 py-3 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12)] backdrop-blur-xl sm:min-w-[5.25rem] sm:px-4 sm:py-4"
+      className={cn(
+        'relative flex flex-col items-center overflow-hidden rounded-xl border border-white/15 bg-white/[0.07] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12)] backdrop-blur-xl',
+        compact ? 'min-w-[3.25rem] px-2 py-2 sm:min-w-[3.75rem]' : 'min-w-[4.25rem] px-3 py-3 sm:min-w-[5.25rem] sm:px-4 sm:py-4 rounded-2xl'
+      )}
       whileHover={{ scale: 1.03, borderColor: 'rgba(255,255,255,0.35)' }}
     >
       <span
         className="pointer-events-none absolute inset-0 bg-gradient-to-b from-rose-500/10 to-transparent opacity-0 transition group-hover:opacity-100"
         aria-hidden
       />
-      <div className="relative flex h-10 items-center justify-center overflow-hidden sm:h-12">
+      <div className={cn('relative flex items-center justify-center overflow-hidden', compact ? 'h-7 sm:h-8' : 'h-10 sm:h-12')}>
         <AnimatePresence mode="popLayout">
           <motion.span
             key={display}
@@ -48,7 +51,10 @@ function DigitBox({ value, label }: { value: number; label: string }) {
             animate={{ y: 0, opacity: 1, filter: 'blur(0px)' }}
             exit={{ y: -20, opacity: 0, filter: 'blur(4px)' }}
             transition={{ type: 'spring', stiffness: 400, damping: 28 }}
-            className="font-display text-3xl font-bold tabular-nums tracking-tight text-white sm:text-4xl"
+            className={cn(
+              'font-display font-bold tabular-nums tracking-tight text-white',
+              compact ? 'text-xl sm:text-2xl' : 'text-3xl sm:text-4xl'
+            )}
           >
             {display}
           </motion.span>
@@ -70,35 +76,41 @@ interface AnimatedCountdownProps {
   endAt?: string;
   className?: string;
   showProgress?: boolean;
+  compact?: boolean;
 }
 
-export default function AnimatedCountdown({ endAt, className, showProgress = true }: AnimatedCountdownProps) {
+export default function AnimatedCountdown({
+  endAt,
+  className,
+  showProgress = true,
+  compact = false,
+}: AnimatedCountdownProps) {
   const time = useCountdown(endAt);
   const progress = Math.min(100, Math.max(0, 100 - (time.total / (6 * 3600 * 1000)) * 100));
 
   return (
     <div className={cn('group', className)}>
-      <div className="flex items-center gap-2 sm:gap-3">
-        <DigitBox value={time.h} label="Hours" />
+      <div className={cn('flex items-center', compact ? 'gap-1.5' : 'gap-2 sm:gap-3')}>
+        <DigitBox value={time.h} label="Hours" compact={compact} />
         <motion.span
           animate={{ opacity: [0.3, 1, 0.3] }}
           transition={{ duration: 1.2, repeat: Infinity }}
-          className="pb-6 text-2xl font-light text-rose-300/80"
+          className={cn('font-light text-rose-300/80', compact ? 'pb-4 text-lg' : 'pb-6 text-2xl')}
         >
           :
         </motion.span>
-        <DigitBox value={time.m} label="Min" />
+        <DigitBox value={time.m} label="Min" compact={compact} />
         <motion.span
           animate={{ opacity: [0.3, 1, 0.3] }}
           transition={{ duration: 1.2, repeat: Infinity, delay: 0.2 }}
-          className="pb-6 text-2xl font-light text-rose-300/80"
+          className={cn('font-light text-rose-300/80', compact ? 'pb-4 text-lg' : 'pb-6 text-2xl')}
         >
           :
         </motion.span>
-        <DigitBox value={time.s} label="Sec" />
+        <DigitBox value={time.s} label="Sec" compact={compact} />
       </div>
       {showProgress && (
-        <div className="mt-6">
+        <div className={compact ? 'mt-3' : 'mt-6'}>
           <motion.div className="mb-2 flex justify-between text-[10px] font-semibold uppercase tracking-wider text-white/45">
             <span>Sale ending</span>
             <span className="text-rose-300">{Math.round(progress)}% left</span>

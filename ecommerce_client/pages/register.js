@@ -112,7 +112,7 @@ export default function Register() {
       title="Create your account"
       subtitle={
         checkoutFlow
-          ? 'Join Macquul to complete your order in seconds'
+          ? 'Join Safari Ecommerce to complete your order in seconds'
           : 'Premium shopping starts with a free account'
       }
       footerLink={{

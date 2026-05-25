@@ -16,8 +16,8 @@ class Command(BaseCommand):
 
             # Create default settings
             settings = SiteSettings.objects.create(
-                site_name='CIGAN E-Store',
-                site_description='Your premier destination for electronics and stationery',
+                site_name='Safari Ecommerce',
+                site_description='Premium curated commerce — exceptional products, trusted delivery, and a world-class shopping experience.',
                 contact_email='support@estore.com',
                 contact_phone='+000 000 0000',
                 address='123 Business Street, City, Country',

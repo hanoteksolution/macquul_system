@@ -11,9 +11,10 @@ interface FlashSaleCarouselProps {
   products: Product[];
   onQuickView?: (product: Product) => void;
   className?: string;
+  compact?: boolean;
 }
 
-export default function FlashSaleCarousel({ products, onQuickView, className }: FlashSaleCarouselProps) {
+export default function FlashSaleCarousel({ products, onQuickView, className, compact }: FlashSaleCarouselProps) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(true);
@@ -70,10 +71,13 @@ export default function FlashSaleCarousel({ products, onQuickView, className }: 
 
       <div
         ref={trackRef}
-        className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2 scrollbar-hide lg:grid lg:grid-cols-2 lg:gap-5 lg:overflow-visible lg:pb-0 xl:grid-cols-2"
+        className={cn(
+          'flex snap-x snap-mandatory overflow-x-auto pb-2 scrollbar-hide lg:grid lg:grid-cols-2 lg:overflow-visible lg:pb-0',
+          compact ? 'gap-3 lg:gap-3' : 'gap-4 lg:gap-5'
+        )}
       >
         {products.map((p, i) => (
-          <FlashSaleProductCard key={p.id} product={p} index={i} onQuickView={onQuickView} />
+          <FlashSaleProductCard key={p.id} product={p} index={i} onQuickView={onQuickView} compact={compact} />
         ))}
       </div>
       </div>

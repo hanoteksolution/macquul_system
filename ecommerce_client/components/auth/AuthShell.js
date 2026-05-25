@@ -17,7 +17,7 @@ import { cn } from '../../lib/utils';
 const heroContent = {
   login: {
     badge: 'Welcome back',
-    title: 'Shop smarter with Macquul',
+    title: 'Shop smarter with Safari Ecommerce',
     description:
       'Access your orders, wishlist, and personalized deals in a secure, premium shopping experience.',
     features: [
@@ -27,7 +27,7 @@ const heroContent = {
     ],
   },
   register: {
-    badge: 'Join Macquul',
+    badge: 'Join Safari Ecommerce',
     title: 'Start your premium shopping journey',
     description:
       'Create an account in seconds and unlock seamless checkout, order history, and curated collections.',
@@ -48,7 +48,7 @@ export default function AuthShell({
 }) {
   const { settings } = useSettings();
   const { theme, toggleTheme } = useTheme();
-  const siteName = settings?.siteName || 'Macquul';
+  const siteName = settings?.siteName || 'Safari Ecommerce';
   const hero = heroContent[variant] || heroContent.login;
 
   return (

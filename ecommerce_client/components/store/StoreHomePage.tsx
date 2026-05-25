@@ -4,7 +4,6 @@ import StoreLayout from './StoreLayout';
 import HeroSection from './home/HeroSection';
 import {
   FeaturedSection,
-  CategoriesSection,
   FlashSaleSection,
   TrendingSection,
   TestimonialsSection,
@@ -24,7 +23,6 @@ export default function StoreHomePage() {
       <div id="products">
         <FeaturedSection products={featured} loading={productsLoading} />
       </div>
-      <CategoriesSection categories={categories} />
       <FlashSaleSection products={products} />
       <TrendingSection products={products} />
       <TestimonialsSection />

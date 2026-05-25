@@ -5,6 +5,10 @@ export interface Category {
   image_url?: string;
   icon?: string;
   product_count?: number;
+  parent_id?: number | null;
+  parent_name?: string | null;
+  children?: Category[];
+  is_parent?: boolean;
 }
 
 export interface Product {

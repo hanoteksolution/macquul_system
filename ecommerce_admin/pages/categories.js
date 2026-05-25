@@ -13,7 +13,8 @@ import {
 import { useNotify } from '../contexts/NotifyContext';
 import MetricCardsRow from '../components/ui/MetricCardsRow';
 import PageActions from '../components/ui/PageActions';
-import { Tags, Image, FolderOpen, Plus } from 'lucide-react';
+import { Tags, Image, FolderOpen, Plus, FolderTree } from 'lucide-react';
+import { buildCategoryTree, flattenCategoryTree, parentOptions } from '../lib/categoryUtils';
 
 
 function CategoryVisual({ category, size = 'lg' }) {
@@ -51,15 +52,29 @@ export default function AdminCategories() {
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [form, setForm] = useState({ name: '', description: '', icon: '', image: null });
+  const [form, setForm] = useState({ name: '', description: '', icon: '', image: null, parent_id: '' });
   const [imagePreview, setImagePreview] = useState('');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  const parseApiError = (err, fallback = 'Request failed') => {
+    const data = err.response?.data;
+    if (!data) return err.message || fallback;
+    if (typeof data === 'string') return data;
+    if (data.detail) return data.detail;
+    if (data.name) return Array.isArray(data.name) ? data.name[0] : data.name;
+    const key = Object.keys(data)[0];
+    if (key) {
+      const val = data[key];
+      return Array.isArray(val) ? val[0] : String(val);
+    }
+    return fallback;
+  };
+
   const load = async () => {
     try {
       setLoading(true);
-      const res = await api.get('/categories/');
+      const res = await api.get('/categories/', { params: { page_size: 500 } });
       setCategories(Array.isArray(res.data) ? res.data : res.data.results || []);
     } catch (err) {
       console.error('Failed to load categories', err);
@@ -73,23 +88,27 @@ export default function AdminCategories() {
   }, []);
 
   const resetForm = () => {
-    setForm({ name: '', description: '', icon: '', image: null });
+    setForm({ name: '', description: '', icon: '', image: null, parent_id: '' });
     setImagePreview('');
     setEditingId(null);
   };
 
-  const openModal = (category = null) => {
+  const openModal = (category = null, parentId = null) => {
     if (category) {
       setForm({
         name: category.name,
         description: category.description || '',
         icon: category.icon || '',
         image: null,
+        parent_id: category.parent_id ? String(category.parent_id) : '',
       });
       setImagePreview(category.image_url || '');
       setEditingId(category.id);
     } else {
       resetForm();
+      if (parentId) {
+        setForm((f) => ({ ...f, parent_id: String(parentId) }));
+      }
     }
     setShowModal(true);
   };
@@ -109,42 +128,60 @@ export default function AdminCategories() {
     }
   };
 
+  const buildPayload = () => ({
+    name: form.name.trim(),
+    description: form.description || '',
+    icon: form.icon || '',
+    parent_id: form.parent_id ? Number(form.parent_id) : null,
+  });
+
   const buildFormData = () => {
     const formData = new FormData();
-    formData.append('name', form.name.trim());
-    formData.append('description', form.description);
-    formData.append('icon', form.icon);
+    const payload = buildPayload();
+    formData.append('name', payload.name);
+    formData.append('description', payload.description);
+    formData.append('icon', payload.icon);
+    if (payload.parent_id != null) {
+      formData.append('parent_id', String(payload.parent_id));
+    }
     if (form.image) {
       formData.append('image', form.image);
     }
     return formData;
   };
 
-  const save = async () => {
+  const save = async (e) => {
+    e?.preventDefault?.();
     if (!form.name.trim()) {
       toast.error('Category name is required');
       return;
     }
     try {
       setSaving(true);
-      const formData = buildFormData();
-      if (editingId) {
-        await api.patch(`/categories/${editingId}/`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        });
+      const hasNewImage = Boolean(form.image);
+
+      if (hasNewImage) {
+        const formData = buildFormData();
+        if (editingId) {
+          await api.patch(`/categories/${editingId}/`, formData);
+        } else {
+          await api.post('/categories/', formData);
+        }
       } else {
-        await api.post('/categories/', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        });
+        const payload = buildPayload();
+        if (editingId) {
+          await api.patch(`/categories/${editingId}/`, payload);
+        } else {
+          await api.post('/categories/', payload);
+        }
       }
+
+      toast.success(editingId ? 'Category updated' : 'Category created');
       closeModal();
       load();
     } catch (err) {
-      const msg =
-        err.response?.data?.name?.[0] ||
-        err.response?.data?.detail ||
-        'Failed to save category';
-      toast.error(msg);
+      console.error('Category save failed', err.response?.data || err);
+      toast.error(parseApiError(err, 'Failed to save category'));
     } finally {
       setSaving(false);
     }
@@ -168,8 +205,12 @@ export default function AdminCategories() {
   const filtered = categories.filter(
     (c) =>
       c.name.toLowerCase().includes(search.toLowerCase()) ||
-      (c.description || '').toLowerCase().includes(search.toLowerCase())
+      (c.description || '').toLowerCase().includes(search.toLowerCase()) ||
+      (c.parent_name || '').toLowerCase().includes(search.toLowerCase())
   );
+  const categoryTree = buildCategoryTree(filtered);
+  const flatRows = flattenCategoryTree(categoryTree);
+  const topLevelParents = parentOptions(categories, editingId);
 
   if (loading && categories.length === 0) {
     return (
@@ -197,7 +238,8 @@ export default function AdminCategories() {
 
         <MetricCardsRow
           metrics={[
-            { label: 'Total categories', value: String(categories.length), subtitle: 'In catalog', icon: Tags, accent: 'indigo' },
+            { label: 'Total categories', value: String(categories.length), subtitle: 'Parents + subcategories', icon: Tags, accent: 'indigo' },
+            { label: 'Parent categories', value: String(categories.filter((c) => !c.parent_id).length), subtitle: 'Top-level', icon: FolderTree, accent: 'violet' },
             { label: 'With images', value: String(categories.filter((c) => c.image_url).length), subtitle: 'Visual categories', icon: Image, accent: 'violet' },
             { label: 'With products', value: String(categories.filter((c) => (c.product_count || 0) > 0).length), subtitle: 'Active categories', icon: FolderOpen, accent: 'emerald' },
             { label: 'Empty', value: String(categories.filter((c) => !(c.product_count || 0)).length), subtitle: 'No products yet', icon: FolderOpen, accent: 'cyan' },
@@ -235,7 +277,7 @@ export default function AdminCategories() {
           </div>
         </div>
 
-        {filtered.length === 0 ? (
+        {flatRows.length === 0 ? (
           <div className="text-center py-16 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700">
             <TagIcon className="h-12 w-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
             <p className="text-gray-600 dark:text-gray-400">No categories found</p>
@@ -249,41 +291,45 @@ export default function AdminCategories() {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filtered.map((c) => (
+          <div className="space-y-3">
+            {flatRows.map((c) => (
               <div
                 key={c.id}
-                className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-lg overflow-hidden hover:shadow-xl transition-shadow"
+                className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden"
+                style={{ marginLeft: c.depth * 24 }}
               >
-                <div className="p-6 flex items-start gap-4">
-                  <CategoryVisual category={c} />
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-lg text-gray-900 dark:text-white truncate">{c.name}</h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-2 mt-1">
-                      {c.description || 'No description'}
-                    </p>
-                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
-                      {c.product_count ?? 0} product(s)
-                    </p>
+                <div className="p-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-start gap-4 min-w-0">
+                    <CategoryVisual category={c} size={c.depth > 0 ? 'sm' : 'lg'} />
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="font-bold text-lg text-gray-900 dark:text-white truncate">{c.name}</h3>
+                        {c.depth === 0 ? (
+                          <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">Parent</span>
+                        ) : (
+                          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">Subcategory</span>
+                        )}
+                      </div>
+                      {c.parent_name && <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-0.5">Under {c.parent_name}</p>}
+                      <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-2 mt-1">{c.description || 'No description'}</p>
+                      <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
+                        {c.product_count ?? 0} product(s){(c.children?.length ?? 0) > 0 && ` · ${c.children.length} subcategories`}
+                      </p>
+                    </div>
                   </div>
-                </div>
-                <div className="flex border-t border-gray-100 dark:border-gray-700">
-                  <button
-                    type="button"
-                    onClick={() => openModal(c)}
-                    className="flex-1 flex items-center justify-center gap-2 py-3 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 text-sm font-medium"
-                  >
-                    <PencilIcon className="h-4 w-4" />
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => remove(c)}
-                    className="flex-1 flex items-center justify-center gap-2 py-3 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 text-sm font-medium border-l border-gray-100 dark:border-gray-700"
-                  >
-                    <TrashIcon className="h-4 w-4" />
-                    Delete
-                  </button>
+                  <div className="flex flex-wrap gap-2 shrink-0">
+                    {c.depth === 0 && (
+                      <button type="button" onClick={() => openModal(null, c.id)} className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-300">
+                        <Plus className="h-3.5 w-3.5" /> Add subcategory
+                      </button>
+                    )}
+                    <button type="button" onClick={() => openModal(c)} className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 px-3 py-2 text-xs font-semibold text-blue-600 hover:bg-blue-50 dark:border-gray-600 dark:hover:bg-blue-900/20">
+                      <PencilIcon className="h-4 w-4" /> Edit
+                    </button>
+                    <button type="button" onClick={() => remove(c)} className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 dark:border-red-900/50 dark:hover:bg-red-900/20">
+                      <TrashIcon className="h-4 w-4" /> Delete
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -298,12 +344,34 @@ export default function AdminCategories() {
                   <h3 className="text-xl font-bold">{editingId ? 'Edit Category' : 'New Category'}</h3>
                   <p className="text-purple-100 text-sm">Upload an image or set an emoji/icon</p>
                 </div>
-                <button onClick={closeModal} className="p-2 hover:bg-white/20 rounded-xl">
+                <button type="button" onClick={closeModal} className="p-2 hover:bg-white/20 rounded-xl">
                   <XMarkIcon className="h-6 w-6" />
                 </button>
               </div>
 
+              <form onSubmit={save}>
               <div className="p-6 space-y-5 overflow-y-auto max-h-[calc(90vh-180px)]">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    Parent category
+                  </label>
+                  <select
+                    value={form.parent_id}
+                    onChange={(e) => setForm({ ...form, parent_id: e.target.value })}
+                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-900 dark:text-white"
+                  >
+                    <option value="">None (top-level category)</option>
+                    {topLevelParents.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Choose a parent to create a subcategory (e.g. Phones under Electronics)
+                  </p>
+                </div>
+
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                     Name *
@@ -312,7 +380,7 @@ export default function AdminCategories() {
                     type="text"
                     value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    placeholder="e.g. Electronics"
+                    placeholder="e.g. Electronics or Phones"
                     className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-900 dark:text-white"
                   />
                 </div>
@@ -389,19 +457,21 @@ export default function AdminCategories() {
 
               <div className="flex justify-end gap-3 p-6 border-t border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700">
                 <button
+                  type="button"
                   onClick={closeModal}
                   className="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-xl text-gray-700 dark:text-gray-300"
                 >
                   Cancel
                 </button>
                 <button
-                  onClick={save}
+                  type="submit"
                   disabled={saving}
                   className="px-6 py-2 bg-gradient-to-r from-purple-500 to-blue-600 text-white rounded-xl font-semibold disabled:opacity-60"
                 >
                   {saving ? 'Saving…' : editingId ? 'Update' : 'Create'}
                 </button>
               </div>
+              </form>
             </div>
           </div>
         )}

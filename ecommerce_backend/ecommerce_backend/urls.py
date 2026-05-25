@@ -29,7 +29,7 @@ urlpatterns = [
     path('api/categories/', include(category_router.urls)),
 ]
 
-# Serve media files during development
+# Media is proxied via nginx in production; always expose upload paths for the API.
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

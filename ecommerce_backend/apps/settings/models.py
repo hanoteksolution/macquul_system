@@ -8,7 +8,7 @@ class SiteSettings(models.Model):
     Only one instance should exist
     """
     # Basic Information
-    site_name = models.CharField(max_length=100, default='CIGAN E-Store')
+    site_name = models.CharField(max_length=100, default='Safari Ecommerce')
     site_description = models.TextField(default='Your premier destination for electronics and stationery')
     logo = models.ImageField(upload_to='settings/logos/', blank=True, null=True)
     favicon = models.ImageField(upload_to='settings/favicons/', blank=True, null=True)

@@ -24,8 +24,10 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { Category, Product } from '@/lib/types';
+import { buildCategoryTree } from '@/lib/category-utils';
 import { count as wishlistCount } from '../../../services/wishlist';
 import AnnouncementBar from './AnnouncementBar';
+import CategoryMegaMenu from './CategoryMegaMenu';
 import { useStorefrontData } from '@/contexts/StorefrontContext';
 
 interface StoreHeaderProps {
@@ -47,8 +49,9 @@ export default function StoreHeader({ categories = [], products = [] }: StoreHea
   const setMobileOpen = useUIStore((s) => s.setMobileMenuOpen);
   const megaCat = useUIStore((s) => s.megaMenuCategory);
   const setMegaCat = useUIStore((s) => s.setMegaMenuCategory);
+  const categoryTree = buildCategoryTree(categories);
   const storefront = useStorefrontData();
-  const siteName = storefront?.header?.site_name || 'Macquul';
+  const siteName = storefront?.header?.site_name || 'Safari Ecommerce';
   const logoUrl = storefront?.header?.logo_url;
   const searchPlaceholder = storefront?.header?.search_placeholder || 'Search products, brands...';
   const navLinks = storefront?.nav_links?.length
@@ -84,12 +87,20 @@ export default function StoreHeader({ categories = [], products = [] }: StoreHea
     : [];
 
   const badge = hydrated ? cartCount() : 0;
+  const activeMegaCategory = categoryTree.find((c) => String(c.id) === megaCat);
+
+  const closeMegaMenu = () => setMegaCat(null);
 
   return (
-    <header className="sticky top-0 z-40">
+    <header className="sticky top-0 z-50">
       <AnnouncementBar />
       <motion.div
-        className={cn('glass-nav transition-shadow duration-300', scrolled && 'shadow-glass-lg')}
+        className={cn(
+          'glass-nav relative transition-shadow duration-300',
+          scrolled && 'shadow-glass-lg',
+          megaCat && 'bg-white shadow-lg dark:bg-zinc-950'
+        )}
+        onMouseLeave={closeMegaMenu}
       >
         <div className="container-store flex h-16 items-center gap-4 lg:h-[72px] lg:gap-8">
           <button
@@ -127,18 +138,35 @@ export default function StoreHeader({ categories = [], products = [] }: StoreHea
                 {link.label}
               </Link>
             ))}
-            {categories.slice(0, 5).map((cat) => (
-              <button
-                key={cat.id}
-                type="button"
-                className="flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-medium hover:bg-slate-100 dark:hover:bg-zinc-800"
-                onMouseEnter={() => setMegaCat(String(cat.id))}
-                onMouseLeave={() => setMegaCat(null)}
-              >
-                {cat.name}
-                <ChevronDown className="h-3.5 w-3.5 opacity-50" />
-              </button>
-            ))}
+            {categoryTree.slice(0, 6).map((cat) => {
+              const isActive = megaCat === String(cat.id);
+              return (
+                <button
+                  key={cat.id}
+                  type="button"
+                  className={cn(
+                    'flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-medium transition-colors',
+                    isActive
+                      ? 'bg-brand-50 text-brand-700 dark:bg-brand-950/50 dark:text-brand-300'
+                      : 'hover:bg-slate-100 dark:hover:bg-zinc-800'
+                  )}
+                  onMouseEnter={() => setMegaCat(String(cat.id))}
+                  onFocus={() => setMegaCat(String(cat.id))}
+                  aria-expanded={isActive}
+                  aria-haspopup="true"
+                >
+                  {cat.name}
+                  {(cat.children?.length ?? 0) > 0 && (
+                    <ChevronDown
+                      className={cn(
+                        'h-3.5 w-3.5 transition-transform',
+                        isActive ? 'rotate-180 text-brand-600' : 'opacity-50'
+                      )}
+                    />
+                  )}
+                </button>
+              );
+            })}
           </nav>
 
           <div className="relative mx-auto hidden max-w-xl flex-1 md:block">
@@ -226,46 +254,13 @@ export default function StoreHeader({ categories = [], products = [] }: StoreHea
           </div>
         </div>
 
-        {megaCat && (
-          <motion.div
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            onMouseLeave={() => setMegaCat(null)}
-            className="absolute left-0 right-0 top-full border-t border-slate-100 bg-white/95 shadow-glass-lg backdrop-blur-2xl dark:border-zinc-800 dark:bg-zinc-950/95"
-          >
-            <div className="container-store grid gap-8 py-8 md:grid-cols-4">
-              {categories
-                .filter((c) => String(c.id) === megaCat)
-                .map((cat) => (
-                  <div key={cat.id} className="md:col-span-1">
-                    <h3 className="font-bold">{cat.name}</h3>
-                    <p className="mt-1 text-sm text-slate-500 line-clamp-2">{cat.description}</p>
-                    <Button className="mt-4" size="sm" asChild>
-                      <Link href={`/shop?category=${cat.id}`}>Shop {cat.name}</Link>
-                    </Button>
-                  </div>
-                ))}
-              <div className="md:col-span-3 grid grid-cols-3 gap-4">
-                {products
-                  .filter((p) => String(p.category?.id) === megaCat)
-                  .slice(0, 3)
-                  .map((p) => (
-                    <Link
-                      key={p.id}
-                      href={`/product/${p.id}`}
-                      className="glass-card group overflow-hidden p-3 transition hover:-translate-y-1"
-                    >
-                      {p.image_url && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={p.image_url} alt="" className="aspect-square w-full rounded-xl object-cover" />
-                      )}
-                      <p className="mt-2 text-sm font-medium line-clamp-1">{p.name}</p>
-                    </Link>
-                  ))}
-              </div>
-            </div>
-          </motion.div>
+        {activeMegaCategory && (
+          <CategoryMegaMenu
+            category={activeMegaCategory}
+            categories={categories}
+            products={products}
+            onNavigate={closeMegaMenu}
+          />
         )}
       </motion.div>
 
@@ -286,15 +281,34 @@ export default function StoreHeader({ categories = [], products = [] }: StoreHea
                 {link.label}
               </Link>
             ))}
-            {categories.map((c) => (
-              <Link
-                key={c.id}
-                href={`/shop?category=${c.id}`}
-                className="rounded-lg px-3 py-2.5 text-slate-600 dark:text-zinc-400"
-                onClick={() => setMobileOpen(false)}
-              >
-                {c.name}
-              </Link>
+            {categoryTree.map((parent) => (
+              <div key={parent.id}>
+                <Link
+                  href={`/shop?category=${parent.id}`}
+                  className="block rounded-lg px-3 py-2.5 font-medium"
+                  onClick={() => setMobileOpen(false)}
+                >
+                  {parent.name}
+                </Link>
+                {(parent.children || []).length > 0 && (
+                  <div className="mb-2 ml-3 grid gap-1 border-l-2 border-brand-200 pl-3 dark:border-brand-800">
+                    {(parent.children || []).map((sub) => (
+                      <Link
+                        key={sub.id}
+                        href={`/shop?category=${sub.id}`}
+                        className="flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-brand-50 hover:text-brand-700 dark:text-zinc-300 dark:hover:bg-brand-950/40 dark:hover:text-brand-300"
+                        onClick={() => setMobileOpen(false)}
+                      >
+                        <span className="flex items-center gap-2">
+                          {sub.icon && <span className="text-base">{sub.icon}</span>}
+                          {sub.name}
+                        </span>
+                        <ChevronDown className="h-4 w-4 -rotate-90 opacity-40" />
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
             ))}
           </nav>
         </motion.div>

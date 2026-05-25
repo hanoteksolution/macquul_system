@@ -20,7 +20,15 @@ const themeInitScript = `
 export default function Document() {
   return (
     <Html lang="en" suppressHydrationWarning>
-      <Head />
+      <Head>
+        <meta
+          name="description"
+          content="Safari Ecommerce — premium curated shopping powered by Safari Techno."
+        />
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+        <link rel="apple-touch-icon" href="/favicon.svg" />
+        <meta name="theme-color" content="#0d9488" />
+      </Head>
       <body>
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
         <Main />

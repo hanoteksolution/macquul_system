@@ -25,18 +25,21 @@ wait_url() {
 
 echo "[wait] Checking Docker port bindings..."
 failed=0
-check_port macquul_system-client-1 3002 || { echo "[wait] FAIL: client port 3002"; failed=1; }
-check_port macquul_system-admin-1 3003 || { echo "[wait] FAIL: admin port 3003"; failed=1; }
-check_port macquul_system-backend-1 8001 || { echo "[wait] FAIL: api port 8001"; failed=1; }
+CLIENT_PORT="${CLIENT_HOST_PORT:-3002}"
+ADMIN_PORT="${ADMIN_HOST_PORT:-3010}"
+API_PORT="${API_HOST_PORT:-8020}"
+check_port macquul_system-client-1 "$CLIENT_PORT" || { echo "[wait] FAIL: client port $CLIENT_PORT"; failed=1; }
+check_port macquul_system-admin-1 "$ADMIN_PORT" || { echo "[wait] FAIL: admin port $ADMIN_PORT"; failed=1; }
+check_port macquul_system-backend-1 "$API_PORT" || { echo "[wait] FAIL: api port $API_PORT"; failed=1; }
 
 if [ "$failed" -eq 1 ]; then
   echo "Run: make down && make up"
   exit 1
 fi
 
-wait_url "Store" "http://127.0.0.1:3002/" || exit 1
-wait_url "Admin" "http://127.0.0.1:3003/" || exit 1
-wait_url "API" "http://127.0.0.1:8001/admin/" || exit 1
+wait_url "Store" "http://127.0.0.1:${CLIENT_PORT}/" || exit 1
+wait_url "Admin" "http://127.0.0.1:${ADMIN_PORT}/" || exit 1
+wait_url "API" "http://127.0.0.1:${API_PORT}/admin/" || exit 1
 
 echo ""
 echo "All services are reachable."

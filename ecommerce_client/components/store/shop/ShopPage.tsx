@@ -19,6 +19,7 @@ import { ProductCardSkeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { Product } from '@/lib/types';
+import { getCategoryMatchIds } from '@/lib/category-utils';
 import type { ShopFilterState, ShopSort, ShopView } from './types';
 
 const DEFAULT_FILTERS = (maxPrice: number): ShopFilterState => ({
@@ -34,11 +35,13 @@ const DEFAULT_FILTERS = (maxPrice: number): ShopFilterState => ({
 function filterProducts(
   products: Product[],
   categoryId: string | undefined,
-  filters: ShopFilterState
+  filters: ShopFilterState,
+  categories: import('@/lib/types').Category[] = []
 ) {
   let list = [...products];
-  if (categoryId) {
-    list = list.filter((p) => String(p.category?.id) === String(categoryId));
+  const matchIds = getCategoryMatchIds(categoryId, categories);
+  if (matchIds) {
+    list = list.filter((p) => p.category?.id != null && matchIds.has(String(p.category.id)));
   }
   if (filters.search.trim()) {
     const q = filters.search.toLowerCase();
@@ -83,8 +86,8 @@ export default function ShopPage() {
   }, [priceBounds.max]);
 
   const filtered = useMemo(
-    () => filterProducts(products, categoryId, filters),
-    [products, categoryId, filters]
+    () => filterProducts(products, categoryId, filters, categories),
+    [products, categoryId, filters, categories]
   );
 
   const suggestions = useMemo(() => {
@@ -102,7 +105,10 @@ export default function ShopPage() {
     const tags: { key: string; label: string }[] = [];
     if (categoryId) {
       const cat = categories.find((c) => String(c.id) === String(categoryId));
-      if (cat) tags.push({ key: 'cat', label: cat.name });
+      if (cat) {
+        const label = cat.parent_name ? `${cat.parent_name} › ${cat.name}` : cat.name;
+        tags.push({ key: 'cat', label });
+      }
     }
     if (filters.inStockOnly) tags.push({ key: 'stock', label: 'In stock' });
     if (filters.priceMax < priceBounds.max) {

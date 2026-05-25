@@ -16,7 +16,14 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-your-secret-key-here'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=True, cast=bool)
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '*']
+ALLOWED_HOSTS = [
+    h.strip()
+    for h in config(
+        'ALLOWED_HOSTS',
+        default='localhost,127.0.0.1,ecommerce.safaritechno.com',
+    ).split(',')
+    if h.strip()
+]
 
 # Application definition
 DJANGO_APPS = [
@@ -156,12 +163,23 @@ SIMPLE_JWT = {
 }
 
 # CORS Settings
-CORS_ALLOWED_ORIGINS = [
+_DEFAULT_CORS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "http://localhost:3001",
     "http://127.0.0.1:3001",
+    "http://localhost:3002",
+    "http://127.0.0.1:3002",
+    "http://localhost:3010",
+    "http://127.0.0.1:3010",
+    "https://ecommerce.safaritechno.com",
 ]
+_cors_env = config('CORS_ALLOWED_ORIGINS', default='')
+CORS_ALLOWED_ORIGINS = (
+    [o.strip() for o in _cors_env.split(',') if o.strip()]
+    if _cors_env
+    else _DEFAULT_CORS
+)
 
 CORS_ALLOW_CREDENTIALS = True
 
@@ -170,9 +188,18 @@ if DEBUG:
     CORS_ALLOW_ALL_ORIGINS = True
 
 # CSRF trusted origins (mainly for session-based endpoints in admin/tests)
-CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://localhost:3001",
-    "http://127.0.0.1:3001",
-]
+_csrf_env = config('CSRF_TRUSTED_ORIGINS', default='')
+CSRF_TRUSTED_ORIGINS = (
+    [o.strip() for o in _csrf_env.split(',') if o.strip()]
+    if _csrf_env
+    else [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
+        "https://ecommerce.safaritechno.com",
+    ]
+)
+
+USE_X_FORWARDED_HOST = True
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')

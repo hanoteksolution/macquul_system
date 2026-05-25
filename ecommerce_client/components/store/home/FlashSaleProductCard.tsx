@@ -17,9 +17,15 @@ interface FlashSaleProductCardProps {
   product: Product;
   index?: number;
   onQuickView?: (product: Product) => void;
+  compact?: boolean;
 }
 
-export default function FlashSaleProductCard({ product, index = 0, onQuickView }: FlashSaleProductCardProps) {
+export default function FlashSaleProductCard({
+  product,
+  index = 0,
+  onQuickView,
+  compact = false,
+}: FlashSaleProductCardProps) {
   const [hovered, setHovered] = useState(false);
   const [wishlisted, setWishlisted] = useState(false);
   const add = useCartStore((s) => s.add);
@@ -41,15 +47,25 @@ export default function FlashSaleProductCard({ product, index = 0, onQuickView }
       transition={{ delay: index * 0.06, duration: 0.45 }}
       onHoverStart={() => setHovered(true)}
       onHoverEnd={() => setHovered(false)}
-      className="group h-full min-w-[200px] max-w-[280px] shrink-0 snap-start sm:min-w-[220px] lg:min-w-0 lg:max-w-none"
+      className={cn(
+        'group h-full shrink-0 snap-start lg:min-w-0 lg:max-w-none',
+        compact ? 'min-w-[160px] max-w-[200px]' : 'min-w-[200px] max-w-[280px] sm:min-w-[220px]'
+      )}
     >
       <div
         className={cn(
-          'flex h-full flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-white/90 shadow-premium backdrop-blur-sm transition-all duration-500 dark:border-white/10 dark:bg-zinc-900/90',
-          hovered && '-translate-y-1.5 shadow-float ring-1 ring-rose-500/20'
+          'flex h-full flex-col overflow-hidden border border-slate-200/80 bg-white/90 shadow-premium backdrop-blur-sm transition-all duration-500 dark:border-white/10 dark:bg-zinc-900/90',
+          compact ? 'rounded-2xl' : 'rounded-3xl',
+          hovered && '-translate-y-1 shadow-float ring-1 ring-rose-500/20'
         )}
       >
-        <Link href={`/product/${product.id}`} className="relative block aspect-[4/5] overflow-hidden bg-slate-100 dark:bg-zinc-800">
+        <Link
+          href={`/product/${product.id}`}
+          className={cn(
+            'relative block overflow-hidden bg-slate-100 dark:bg-zinc-800',
+            compact ? 'aspect-[4/3]' : 'aspect-[4/5]'
+          )}
+        >
           {product.image_url ? (
             <Image
               src={product.image_url}
@@ -114,12 +130,17 @@ export default function FlashSaleProductCard({ product, index = 0, onQuickView }
             </Button>
           </motion.div>
         </Link>
-        <motion.div className="flex flex-1 flex-col p-4">
+        <div className={cn('flex flex-1 flex-col', compact ? 'p-2.5' : 'p-4')}>
           <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-rose-600 dark:text-rose-400">
             {product.category?.name}
           </p>
           <Link href={`/product/${product.id}`}>
-            <h3 className="mt-1 line-clamp-2 text-sm font-semibold leading-snug text-slate-900 dark:text-white">
+            <h3
+              className={cn(
+                'mt-1 line-clamp-2 font-semibold leading-snug text-slate-900 dark:text-white',
+                compact ? 'text-xs' : 'text-sm'
+              )}
+            >
               {product.name}
             </h3>
           </Link>
@@ -130,7 +151,14 @@ export default function FlashSaleProductCard({ product, index = 0, onQuickView }
           </div>
           <div className="mt-auto flex items-end justify-between gap-2 pt-3">
             <div>
-              <span className="text-lg font-bold text-slate-900 dark:text-white">{formatPrice(price)}</span>
+              <span
+                className={cn(
+                  'font-bold text-slate-900 dark:text-white',
+                  compact ? 'text-base' : 'text-lg'
+                )}
+              >
+                {formatPrice(price)}
+              </span>
               {onSale && (
                 <span className="ml-1.5 text-xs text-slate-400 line-through">{formatPrice(compareAt)}</span>
               )}
@@ -142,7 +170,7 @@ export default function FlashSaleProductCard({ product, index = 0, onQuickView }
               </span>
             )}
           </div>
-        </motion.div>
+        </div>
       </div>
     </motion.article>
   );
