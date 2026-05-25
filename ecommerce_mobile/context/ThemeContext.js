@@ -1,7 +1,13 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  lightPremium,
+  darkPremium,
+  lightShimmer,
+  darkShimmer,
+} from '../constants/premiumThemes';
 
-const ThemeContext = createContext();
+const ThemeContext = createContext(null);
 
 export const useTheme = () => {
   const context = useContext(ThemeContext);
@@ -11,42 +17,34 @@ export const useTheme = () => {
   return context;
 };
 
-// Light theme colors
-const lightTheme = {
-  primary: '#4ade80',
-  secondary: '#22d3ee',
-  accent: '#f59e0b',
-  background: '#f8fafc',
-  surface: '#ffffff',
-  text: '#1f2937',
-  textSecondary: '#6b7280',
-  border: '#e5e7eb',
+const legacyLight = {
+  primary: lightPremium.emerald,
+  secondary: lightPremium.indigo,
+  accent: lightPremium.violet,
+  background: lightPremium.background,
+  surface: lightPremium.surface,
+  text: lightPremium.text,
+  textSecondary: lightPremium.textSecondary,
+  border: lightPremium.border,
   error: '#ef4444',
-  success: '#10b981',
+  success: lightPremium.emerald,
   warning: '#f59e0b',
   info: '#3b82f6',
-  primaryLight: '#4ade8020',
-  secondaryLight: '#22d3ee20',
-  textLight: '#1f293720',
 };
 
-// Dark theme colors
-const darkTheme = {
-  primary: '#4ade80',
-  secondary: '#22d3ee',
-  accent: '#f59e0b',
-  background: '#111827',
-  surface: '#1f2937',
-  text: '#f9fafb',
-  textSecondary: '#9ca3af',
-  border: '#374151',
+const legacyDark = {
+  primary: darkPremium.emeraldLight,
+  secondary: darkPremium.cyan,
+  accent: darkPremium.violet,
+  background: darkPremium.background,
+  surface: darkPremium.surface,
+  text: darkPremium.text,
+  textSecondary: darkPremium.textSecondary,
+  border: darkPremium.border,
   error: '#ef4444',
-  success: '#10b981',
+  success: darkPremium.emerald,
   warning: '#f59e0b',
   info: '#3b82f6',
-  primaryLight: '#4ade8030',
-  secondaryLight: '#22d3ee30',
-  textLight: '#f9fafb20',
 };
 
 export const ThemeProvider = ({ children }) => {
@@ -80,14 +78,21 @@ export const ThemeProvider = ({ children }) => {
     }
   };
 
-  const theme = isDarkMode ? darkTheme : lightTheme;
+  const premium = isDarkMode ? darkPremium : lightPremium;
+  const shimmer = isDarkMode ? darkShimmer : lightShimmer;
+  const theme = isDarkMode ? legacyDark : legacyLight;
 
-  const value = {
-    isDarkMode,
-    theme,
-    toggleTheme,
-    loading,
-  };
+  const value = useMemo(
+    () => ({
+      isDarkMode,
+      theme,
+      premium,
+      shimmer,
+      toggleTheme,
+      loading,
+    }),
+    [isDarkMode, theme, premium, shimmer, loading]
+  );
 
   return (
     <ThemeContext.Provider value={value}>

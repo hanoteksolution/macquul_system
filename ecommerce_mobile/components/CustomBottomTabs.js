@@ -1,94 +1,48 @@
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  SafeAreaView,
-} from 'react-native';
-import { colors } from '../constants/colors';
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { getScrollBottomPadding } from '../constants/tabBarLayout';
+import usePremiumTheme from '../hooks/usePremiumTheme';
+import useThemedStyles from '../hooks/useThemedStyles';
+import PremiumBottomDock from './premium/PremiumBottomDock';
 
-const CustomBottomTabs = ({ children, initialTab = 0, navigation }) => {
-  const [activeTab, setActiveTab] = useState(initialTab);
+export default function CustomBottomTabs({ children, initialTab = 0, navigation, route }) {
+  const premium = usePremiumTheme();
+  const styles = useThemedStyles(createStyles);
 
-  const tabs = [
-    { name: 'Home', icon: '🏠', activeIcon: '🏠' },
-    { name: 'Products', icon: '📦', activeIcon: '📦' },
-    { name: 'Orders', icon: '📋', activeIcon: '📋' },
-    { name: 'Profile', icon: '👤', activeIcon: '👤' },
-  ];
+
+  const tabFromRoute = route?.params?.tab;
+  const [activeTab, setActiveTab] = useState(
+    tabFromRoute !== undefined && tabFromRoute !== null ? tabFromRoute : initialTab
+  );
+  const insets = useSafeAreaInsets();
+  const bottomInset = getScrollBottomPadding(insets);
+
+  useEffect(() => {
+    if (tabFromRoute !== undefined && tabFromRoute !== null) {
+      setActiveTab(tabFromRoute);
+    }
+  }, [tabFromRoute]);
+
+  const childProps = { navigation, route, setActiveTab, bottomInset };
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Content Area */}
+    <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.content}>
-        {React.cloneElement(children[activeTab], { navigation })}
+        {React.Children.map(children, (child, index) =>
+          index === activeTab ? React.cloneElement(child, childProps) : null
+        )}
       </View>
 
-      {/* Custom Bottom Tab Bar */}
-      <View style={styles.tabBar}>
-        {tabs.map((tab, index) => (
-          <TouchableOpacity
-            key={tab.name}
-            style={styles.tabItem}
-            onPress={() => setActiveTab(index)}
-          >
-            <Text style={[styles.tabIcon, activeTab === index && styles.activeTabIcon]}>
-              {activeTab === index ? tab.activeIcon : tab.icon}
-            </Text>
-            <Text style={[styles.tabLabel, activeTab === index && styles.activeTabLabel]}>
-              {tab.name}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      <PremiumBottomDock navigation={navigation} activeTab={activeTab} />
     </SafeAreaView>
   );
-};
+}
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  content: {
-    flex: 1,
-  },
-  tabBar: {
-    flexDirection: 'row',
-    backgroundColor: colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    paddingBottom: 8,
-    paddingTop: 8,
-    height: 70,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  tabItem: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tabIcon: {
-    fontSize: 24,
-    marginBottom: 4,
-    opacity: 0.6,
-  },
-  activeTabIcon: {
-    opacity: 1,
-  },
-  tabLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.textSecondary,
-  },
-  activeTabLabel: {
-    color: colors.primary,
-  },
+const createStyles = (premium) => ({
+
+  container: { flex: 1, backgroundColor: premium.background },
+  content: { flex: 1 },
 });
 
-export default CustomBottomTabs;

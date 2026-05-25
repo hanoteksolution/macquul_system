@@ -20,8 +20,8 @@ class OrderViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         if getattr(user, 'is_admin', False):
-            return Order.objects.prefetch_related('items').all()
-        return Order.objects.prefetch_related('items').filter(user=user)
+            return Order.objects.prefetch_related('items__product').all()
+        return Order.objects.prefetch_related('items__product').filter(user=user)
 
     @transaction.atomic
     def create(self, request, *args, **kwargs):

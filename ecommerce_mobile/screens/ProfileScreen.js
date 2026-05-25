@@ -3,20 +3,40 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
+  ScrollView,
   TouchableOpacity,
-  Alert,
   Switch,
-  ActivityIndicator,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { useCart } from '../context/CartContext';
 import { isAuthenticated, getCurrentUser, logout } from '../utils/auth';
+import PremiumScreenTitle from '../components/premium/PremiumScreenTitle';
+import PremiumMenuRow from '../components/premium/PremiumMenuRow';
+import PremiumEmptyState from '../components/premium/PremiumEmptyState';
+import premiumAlert from '../utils/premiumAlert';
+import usePremiumTheme from '../hooks/usePremiumTheme';
+import useThemedStyles from '../hooks/useThemedStyles';
+import ProfileScreenShimmer from '../components/premium/skeletons/ProfileScreenShimmer';
 
-export default function ProfileScreen({ navigation }) {
-  const { theme, isDarkMode, toggleTheme } = useTheme();
-  const { cart, wishlist, getCartItemCount } = useCart();
+const MENU_ITEMS = [
+  { icon: 'person-outline', label: 'Account settings', gradient: ['#8b5cf6', '#6366f1'] },
+  { icon: 'receipt-outline', label: 'Order history', gradient: ['#3b82f6', '#6366f1'], tab: 2 },
+  { icon: 'heart-outline', label: 'Wishlist', gradient: ['#ec4899', '#f43f5e'], route: 'Wishlist', badgeKey: 'wishlist' },
+  { icon: 'bag-outline', label: 'Shopping cart', gradient: ['#8b5cf6', '#a855f7'], route: 'Cart', badgeKey: 'cart' },
+  { icon: 'location-outline', label: 'Addresses', gradient: ['#06b6d4', '#3b82f6'] },
+  { icon: 'card-outline', label: 'Payment methods', gradient: ['#14b8a6', '#10b981'] },
+];
+
+export default function ProfileScreen({ navigation, setActiveTab, bottomInset = 52 }) {
+  const premium = usePremiumTheme();
+  const styles = useThemedStyles(createStyles);
+
+
+  const { isDarkMode, toggleTheme } = useTheme();
+  const { wishlist, getCartItemCount } = useCart();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [authenticated, setAuthenticated] = useState(false);
@@ -29,324 +49,228 @@ export default function ProfileScreen({ navigation }) {
     try {
       const isAuth = await isAuthenticated();
       setAuthenticated(isAuth);
-      
-      if (isAuth) {
-        const userData = await getCurrentUser();
-        setUser(userData);
-      }
-    } catch (error) {
-      console.error('Error loading user data:', error);
+      if (isAuth) setUser(await getCurrentUser());
+    } catch (e) {
+      console.error(e);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleLogout = async () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await logout();
-              setUser(null);
-              setAuthenticated(false);
-              Alert.alert('Success', 'Logged out successfully');
-            } catch (error) {
-              Alert.alert('Error', 'Failed to logout');
-            }
-          }
-        }
-      ]
-    );
+  const handleLogout = () => {
+    premiumAlert('Sign out?', 'You will need to sign in again to access your account.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Sign out',
+        style: 'destructive',
+        onPress: async () => {
+          await logout();
+          setUser(null);
+          setAuthenticated(false);
+        },
+      },
+    ], { variant: 'warning' });
   };
 
-  const getInitials = (name) => {
-    if (!name) return 'U';
-    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  const initials = () => {
+    const name =
+      user?.first_name && user?.last_name
+        ? `${user.first_name} ${user.last_name}`
+        : user?.username || 'U';
+    return name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
+  };
+
+  const getBadge = (key) => {
+    if (key === 'wishlist') return wishlist.length;
+    if (key === 'cart') return getCartItemCount();
+    return 0;
+  };
+
+  const onMenuPress = (item) => {
+    if (item.tab != null && setActiveTab) setActiveTab(item.tab);
+    else if (item.route) navigation.navigate(item.route);
+    else premiumAlert(item.label, 'This section is coming soon.', [{ text: 'OK' }], { variant: 'info' });
   };
 
   if (loading) {
-    return (
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={theme.primary} />
-          <Text style={[styles.loadingText, { color: theme.textSecondary }]}>Loading profile...</Text>
-        </View>
-      </SafeAreaView>
-    );
+    return <ProfileScreenShimmer bottomInset={bottomInset} />;
   }
 
   if (!authenticated) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-        <View style={[styles.header, { backgroundColor: theme.surface }]}>
-          <Text style={[styles.title, { color: theme.text }]}>Profile</Text>
-        </View>
-        
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyIcon}>👤</Text>
-          <Text style={[styles.emptyTitle, { color: theme.text }]}>Not Logged In</Text>
-          <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
-            Please login to access your profile
-          </Text>
-          <TouchableOpacity 
-            style={[styles.loginButton, { backgroundColor: theme.primary }]}
-            onPress={() => navigation.navigate('Login')}
-          >
-            <Text style={styles.loginButtonText}>Login</Text>
-          </TouchableOpacity>
-        </View>
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <PremiumScreenTitle title="Profile" subtitle="Your account & preferences" />
+        <PremiumEmptyState
+          icon="person-outline"
+          title="Not logged in"
+          subtitle="Sign in to manage orders, wishlist, and settings."
+          buttonLabel="Sign In"
+          onButtonPress={() => navigation.navigate('Login')}
+        />
       </SafeAreaView>
     );
   }
 
+  const displayName =
+    user?.first_name && user?.last_name
+      ? `${user.first_name} ${user.last_name}`
+      : user?.username || 'User';
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-      <View style={[styles.header, { backgroundColor: theme.surface }]}>
-        <View style={styles.profileSection}>
-          <View style={[styles.avatar, { backgroundColor: theme.primary }]}>
-            <Text style={styles.avatarText}>
-              {getInitials(user?.first_name && user?.last_name 
-                ? `${user.first_name} ${user.last_name}` 
-                : user?.username || 'User')}
-            </Text>
-          </View>
-          <View style={styles.userInfo}>
-            <Text style={[styles.userName, { color: theme.text }]}>
-              {user?.first_name && user?.last_name 
-                ? `${user.first_name} ${user.last_name}` 
-                : user?.username || 'User'}
-            </Text>
-            <Text style={[styles.userEmail, { color: theme.textSecondary }]}>
-              {user?.email || 'No email'}
-            </Text>
-          </View>
-        </View>
-      </View>
-      
-      <View style={styles.content}>
-        {/* Theme Toggle */}
-        <View style={[styles.menuItem, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <Text style={styles.menuIcon}>{isDarkMode ? '🌙' : '☀️'}</Text>
-          <Text style={[styles.menuText, { color: theme.text }]}>
-            {isDarkMode ? 'Dark Mode' : 'Light Mode'}
-          </Text>
-          <Switch
-            value={isDarkMode}
-            onValueChange={toggleTheme}
-            trackColor={{ false: theme.border, true: theme.primary }}
-            thumbColor={isDarkMode ? theme.surface : theme.background}
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[styles.scroll, { paddingBottom: bottomInset }]}
+      >
+        <PremiumScreenTitle
+          title="Profile"
+          subtitle="Your account & preferences"
+          actions={[
+            { icon: 'notifications-outline', onPress: () => {}, badge: 2, badgeColor: '#f43f5e' },
+            {
+              icon: 'settings-outline',
+              onPress: () => premiumAlert('Settings', 'App settings coming soon.', [{ text: 'OK' }]),
+            },
+          ]}
+        />
+
+        <TouchableOpacity activeOpacity={0.95} onPress={() => {}}>
+          <LinearGradient colors={premium.gradientPrimary} style={styles.profileCard} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+            <View style={styles.avatarRing}>
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{initials()}</Text>
+              </View>
+            </View>
+            <View style={styles.profileInfo}>
+              <Text style={styles.profileName}>{displayName}</Text>
+              <Text style={styles.profileEmail}>{user?.email || 'No email'}</Text>
+              <View style={styles.verifiedBadge}>
+                <Ionicons name="checkmark-circle" size={14} color={premium.emeraldLight} />
+                <Text style={styles.verifiedText}>Verified</Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={22} color="rgba(255,255,255,0.7)" />
+          </LinearGradient>
+        </TouchableOpacity>
+
+        <Text style={styles.sectionLabel}>Preferences</Text>
+        <PremiumMenuRow
+          icon={isDarkMode ? 'moon' : 'sunny'}
+          label={isDarkMode ? 'Dark mode' : 'Light mode'}
+          iconGradient={isDarkMode ? ['#312e81', '#6366f1'] : ['#fbbf24', '#f59e0b']}
+          showArrow={false}
+          rightElement={
+            <Switch
+              value={isDarkMode}
+              onValueChange={toggleTheme}
+              trackColor={{ false: premium.border, true: premium.indigo }}
+              thumbColor={premium.white}
+            />
+          }
+        />
+
+        <Text style={styles.sectionLabel}>Account</Text>
+        {MENU_ITEMS.map((item) => (
+          <PremiumMenuRow
+            key={item.label}
+            icon={item.icon}
+            label={item.label}
+            iconGradient={item.gradient}
+            badge={getBadge(item.badgeKey)}
+            onPress={() => onMenuPress(item)}
           />
-        </View>
+        ))}
 
-        {/* Account Settings */}
-        <TouchableOpacity style={[styles.menuItem, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <Text style={styles.menuIcon}>👤</Text>
-          <Text style={[styles.menuText, { color: theme.text }]}>Account Settings</Text>
-          <Text style={[styles.menuArrow, { color: theme.textSecondary }]}>›</Text>
+        <TouchableOpacity onPress={handleLogout} activeOpacity={0.9} style={styles.logoutWrap}>
+          <LinearGradient colors={['#fef2f2', '#fff']} style={styles.logoutCard}>
+            <View style={styles.logoutIconWrap}>
+              <Ionicons name="log-out-outline" size={24} color="#ef4444" />
+            </View>
+            <View style={styles.logoutText}>
+              <Text style={styles.logoutTitle}>Logout</Text>
+              <Text style={styles.logoutSub}>Sign out from your account</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#f87171" />
+          </LinearGradient>
         </TouchableOpacity>
-        
-        {/* Order History */}
-        <TouchableOpacity 
-          style={[styles.menuItem, { backgroundColor: theme.surface, borderColor: theme.border }]}
-          onPress={() => navigation.navigate('Main', { screen: 'Orders' })}
-        >
-          <Text style={styles.menuIcon}>📋</Text>
-          <Text style={[styles.menuText, { color: theme.text }]}>Order History</Text>
-          <Text style={[styles.menuArrow, { color: theme.textSecondary }]}>›</Text>
-        </TouchableOpacity>
-        
-        {/* Wishlist */}
-        <TouchableOpacity 
-          style={[styles.menuItem, { backgroundColor: theme.surface, borderColor: theme.border }]}
-          onPress={() => navigation.navigate('Wishlist')}
-        >
-          <Text style={styles.menuIcon}>❤️</Text>
-          <Text style={[styles.menuText, { color: theme.text }]}>Wishlist</Text>
-          <View style={styles.menuRight}>
-            {wishlist.length > 0 && (
-              <View style={[styles.badge, { backgroundColor: theme.primary }]}>
-                <Text style={styles.badgeText}>{wishlist.length}</Text>
-              </View>
-            )}
-            <Text style={[styles.menuArrow, { color: theme.textSecondary }]}>›</Text>
-          </View>
-        </TouchableOpacity>
-
-        {/* Cart */}
-        <TouchableOpacity 
-          style={[styles.menuItem, { backgroundColor: theme.surface, borderColor: theme.border }]}
-          onPress={() => navigation.navigate('Cart')}
-        >
-          <Text style={styles.menuIcon}>🛒</Text>
-          <Text style={[styles.menuText, { color: theme.text }]}>Shopping Cart</Text>
-          <View style={styles.menuRight}>
-            {getCartItemCount() > 0 && (
-              <View style={[styles.badge, { backgroundColor: theme.primary }]}>
-                <Text style={styles.badgeText}>{getCartItemCount()}</Text>
-              </View>
-            )}
-            <Text style={[styles.menuArrow, { color: theme.textSecondary }]}>›</Text>
-          </View>
-        </TouchableOpacity>
-        
-        {/* Logout */}
-        <TouchableOpacity 
-          style={[styles.menuItem, styles.logoutButton, { backgroundColor: theme.error + '20', borderColor: theme.error }]} 
-          onPress={handleLogout}
-        >
-          <Text style={styles.menuIcon}>🚪</Text>
-          <Text style={[styles.menuText, { color: theme.error }]}>Logout</Text>
-        </TouchableOpacity>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { 
-    flex: 1 
-  },
-  header: { 
-    paddingTop: 50, 
-    paddingBottom: 20, 
-    paddingHorizontal: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-  },
-  profileSection: { 
-    flexDirection: 'row', 
-    alignItems: 'center' 
-  },
-  avatar: { 
-    width: 80, 
-    height: 80, 
-    borderRadius: 40, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    marginRight: 16 
-  },
-  avatarText: { 
-    fontSize: 24, 
-    fontWeight: 'bold', 
-    color: 'white' 
-  },
-  userInfo: { 
-    flex: 1 
-  },
-  userName: { 
-    fontSize: 24, 
-    fontWeight: 'bold', 
-    marginBottom: 4 
-  },
-  userEmail: { 
-    fontSize: 16 
-  },
-  content: { 
-    flex: 1, 
-    padding: 20 
-  },
-  menuItem: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    padding: 16, 
-    borderRadius: 12, 
-    marginBottom: 12,
-    borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  menuIcon: { 
-    fontSize: 20, 
-    marginRight: 16, 
-    width: 24 
-  },
-  menuText: { 
-    flex: 1, 
-    fontSize: 16, 
-    fontWeight: '500' 
-  },
-  menuArrow: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  menuRight: {
+const createStyles = (premium) => ({
+
+  container: { flex: 1, backgroundColor: premium.background },
+  scroll: { paddingHorizontal: 20 },
+  profileCard: {
     flexDirection: 'row',
     alignItems: 'center',
+    borderRadius: premium.radiusXl,
+    padding: 22,
+    marginBottom: 24,
+    ...premium.shadowCard,
   },
-  badge: {
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
-    justifyContent: 'center',
+  avatarRing: {
+    padding: 3,
+    borderRadius: 40,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.4)',
+    marginRight: 16,
+  },
+  avatar: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
-    marginRight: 8,
-  },
-  badgeText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  logoutButton: { 
-    marginTop: 20 
-  },
-  emptyContainer: {
-    flex: 1,
     justifyContent: 'center',
+  },
+  avatarText: { fontSize: 24, fontWeight: '800', color: '#fff' },
+  profileInfo: { flex: 1 },
+  profileName: { fontSize: 20, fontWeight: '800', color: '#fff', marginBottom: 4 },
+  profileEmail: { fontSize: 14, color: 'rgba(255,255,255,0.85)' },
+  verifiedBadge: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 32,
+    gap: 4,
+    marginTop: 8,
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
   },
-  emptyIcon: {
-    fontSize: 64,
-    marginBottom: 16,
+  verifiedText: { fontSize: 12, fontWeight: '700', color: '#fff' },
+  sectionLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: premium.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 10,
+    marginTop: 4,
   },
-  emptyTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 8,
+  logoutWrap: { marginTop: 8, marginBottom: 16 },
+  logoutCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: premium.radiusLg,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.25)',
+    ...premium.shadowSoft,
   },
-  emptySubtitle: {
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 32,
-  },
-  loginButton: {
-    paddingHorizontal: 32,
-    paddingVertical: 16,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  loginButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  loadingContainer: {
-    flex: 1,
+  logoutIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
+    marginRight: 14,
   },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-  },
+  logoutText: { flex: 1 },
+  logoutTitle: { fontSize: 16, fontWeight: '700', color: '#ef4444' },
+  logoutSub: { fontSize: 13, color: '#f87171', marginTop: 2 },
 });
+

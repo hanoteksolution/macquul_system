@@ -48,9 +48,10 @@ npx expo start --clear
 ## What Changed
 
 ### package.json
-- Updated `expo` from `~51.0.17` to `~54.0.0`
-- Updated `expo-status-bar` from `~1.12.1` to `~2.0.0`
-- Updated `react-native` from `0.74.5` to `0.76.0`
+- Updated `expo` from `~51.0.28` to `~54.0.0`
+- Updated `expo-status-bar` from `~1.12.1` to `~3.0.8`
+- Updated `react-native` from `0.74.5` to `0.81.5`
+- Updated `react` from `18.2.0` to `19.1.0`
 - Updated navigation packages to compatible versions
 - Updated other dependencies to SDK 54 compatible versions
 

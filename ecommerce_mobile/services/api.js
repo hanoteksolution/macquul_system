@@ -1,6 +1,7 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Alert, Platform } from 'react-native';
+import { Platform } from 'react-native';
+import premiumAlert from '../utils/premiumAlert';
 
 /**
  * API base URL (no /api suffix).
@@ -27,16 +28,16 @@ export const setNavigationRef = (ref) => {
 const logout = async () => {
   try {
     await AsyncStorage.multiRemove(['access', 'refresh', 'user']);
-    Alert.alert('Session Expired', 'Your session has expired. Please login again.', [
+    premiumAlert('Session expired', 'Your session has ended. Please sign in again.', [
       {
-        text: 'OK',
+        text: 'Sign In',
         onPress: () => {
           if (navigationRef) {
             navigationRef.reset({ index: 0, routes: [{ name: 'Login' }] });
           }
         },
       },
-    ]);
+    ], { variant: 'login' });
   } catch (error) {
     console.error('Error during automatic logout:', error);
   }

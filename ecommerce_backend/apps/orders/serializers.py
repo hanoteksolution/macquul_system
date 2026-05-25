@@ -6,11 +6,21 @@ from .models import Order, OrderItem
 
 class OrderItemSerializer(serializers.ModelSerializer):
     product_name = serializers.ReadOnlyField(source='product.name')
+    image_url = serializers.SerializerMethodField()
 
     class Meta:
         model = OrderItem
-        fields = ['id', 'product', 'product_name', 'quantity', 'price']
+        fields = ['id', 'product', 'product_name', 'quantity', 'price', 'image_url']
         read_only_fields = ['id', 'price']
+
+    def get_image_url(self, obj):
+        product = getattr(obj, 'product', None)
+        if not product or not product.image:
+            return None
+        request = self.context.get('request')
+        if request:
+            return request.build_absolute_uri(product.image.url)
+        return product.image.url
 
 
 class OrderSerializer(serializers.ModelSerializer):

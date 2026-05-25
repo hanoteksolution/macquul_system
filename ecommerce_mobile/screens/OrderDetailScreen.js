@@ -3,33 +3,61 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   TouchableOpacity,
-  ActivityIndicator,
-  FlatList,
-  Image,
 } from 'react-native';
-import { useTheme } from '../context/ThemeContext';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import api from '../services/api';
+import PremiumPageHeader from '../components/premium/PremiumPageHeader';
+import OrderTrackingSteps from '../components/premium/orders/OrderTrackingSteps';
+import OrderLineItem from '../components/premium/orders/OrderLineItem';
+import PremiumEmptyState from '../components/premium/PremiumEmptyState';
+import {
+  getStatusMeta,
+  formatOrderDateTime,
+  getOrderTotal,
+} from '../utils/orderStatus';
+import premiumAlert from '../utils/premiumAlert';
+import usePremiumTheme from '../hooks/usePremiumTheme';
+import useThemedStyles from '../hooks/useThemedStyles';
+import OrderDetailShimmer from '../components/premium/skeletons/OrderDetailShimmer';
+import { resolveMediaUrl } from '../utils/mediaUrl';
 
-const OrderItemCard = ({ item, theme }) => (
-  <View style={[styles.itemCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-    <View style={styles.itemInfo}>
-      <Text style={[styles.itemName, { color: theme.text }]}>{item.product_name || item.name}</Text>
-      <Text style={[styles.itemPrice, { color: theme.primary }]}>
-        ${parseFloat(item.price || 0).toFixed(2)} x {item.quantity}
-      </Text>
-      <Text style={[styles.itemTotal, { color: theme.text }]}>
-        Total: ${(parseFloat(item.price || 0) * parseInt(item.quantity || 1)).toFixed(2)}
-      </Text>
-    </View>
-  </View>
-);
+async function enrichOrderItemsWithImages(order) {
+  if (!order?.items?.length) return order;
+  const missing = order.items.some((item) => !item.image_url && item.product);
+  if (!missing) return order;
+
+  try {
+    const res = await api.get('/products/');
+    const list = res.data?.results || res.data || [];
+    const byId = new Map(list.map((p) => [p.id, p]));
+    return {
+      ...order,
+      items: order.items.map((item) => {
+        const productId =
+          typeof item.product === 'object' ? item.product?.id : item.product;
+        const product = byId.get(productId);
+        const image_url =
+          item.image_url ||
+          product?.image_url ||
+          resolveMediaUrl(product?.image);
+        return image_url ? { ...item, image_url } : item;
+      }),
+    };
+  } catch {
+    return order;
+  }
+}
 
 export default function OrderDetailScreen({ route, navigation }) {
+  const premium = usePremiumTheme();
+  const styles = useThemedStyles(createStyles);
+
+
   const { orderId } = route.params;
-  const { theme } = useTheme();
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -41,315 +69,203 @@ export default function OrderDetailScreen({ route, navigation }) {
     try {
       setLoading(true);
       const response = await api.get(`/orders/${orderId}/`);
-      setOrder(response.data);
+      const enriched = await enrichOrderItemsWithImages(response.data);
+      setOrder(enriched);
     } catch (error) {
-      console.error('Error loading order details:', error);
+      console.error(error);
     } finally {
       setLoading(false);
     }
   };
 
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  const getStatusColor = (status) => {
-    switch (status?.toLowerCase()) {
-      case 'delivered': return theme.success;
-      case 'processing': return theme.warning;
-      case 'shipped': return theme.info;
-      case 'cancelled': return theme.error;
-      default: return theme.textSecondary;
-    }
-  };
-
   if (loading) {
-    return (
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-        <View style={[styles.header, { backgroundColor: theme.surface }]}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Text style={[styles.backButton, { color: theme.text }]}>←</Text>
-          </TouchableOpacity>
-          <Text style={[styles.title, { color: theme.text }]}>Order Details</Text>
-          <View style={styles.placeholder} />
-        </View>
-        
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={theme.primary} />
-          <Text style={[styles.loadingText, { color: theme.textSecondary }]}>Loading order details...</Text>
-        </View>
-      </SafeAreaView>
-    );
+    return <OrderDetailShimmer />;
   }
 
   if (!order) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-        <View style={[styles.header, { backgroundColor: theme.surface }]}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Text style={[styles.backButton, { color: theme.text }]}>←</Text>
-          </TouchableOpacity>
-          <Text style={[styles.title, { color: theme.text }]}>Order Details</Text>
-          <View style={styles.placeholder} />
-        </View>
-        
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyIcon}>📦</Text>
-          <Text style={[styles.emptyTitle, { color: theme.text }]}>Order Not Found</Text>
-          <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
-            This order could not be loaded
-          </Text>
-        </View>
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <PremiumPageHeader title="Order Details" onBack={() => navigation.goBack()} />
+        <PremiumEmptyState icon="document-outline" title="Order not found" subtitle="This order could not be loaded." />
       </SafeAreaView>
     );
   }
 
-  // Calculate total from items if total_amount is not available
-  const calculateTotalFromItems = () => {
-    if (order.items && order.items.length > 0) {
-      return order.items.reduce((sum, item) => {
-        const price = parseFloat(item.price || 0);
-        const quantity = parseInt(item.quantity || 1);
-        return sum + (price * quantity);
-      }, 0);
-    }
-    return 0;
-  };
-
-  const orderTotal = parseFloat(order.total_amount || order.total || 0) || calculateTotalFromItems();
+  const meta = getStatusMeta(order.status);
+  const orderTotal = getOrderTotal(order);
+  const subtotal = orderTotal;
+  const shipping = parseFloat(order.shipping_fee || 0);
+  const tax = parseFloat(order.tax || 0);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-      <View style={[styles.header, { backgroundColor: theme.surface }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={[styles.backButton, { color: theme.text }]}>←</Text>
-        </TouchableOpacity>
-        <Text style={[styles.title, { color: theme.text }]}>Order Details</Text>
-        <View style={styles.placeholder} />
-      </View>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <PremiumPageHeader
+        title="Order Details"
+        onBack={() => navigation.goBack()}
+        rightIcon="ellipsis-horizontal"
+        onRightPress={() => premiumAlert('Options', 'More actions coming soon.', [{ text: 'OK' }])}
+      />
 
-      <ScrollView style={styles.content}>
-        {/* Order Info */}
-        <View style={[styles.orderInfo, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <View style={styles.orderHeader}>
-            <Text style={[styles.orderNumber, { color: theme.text }]}>Order #{order.id}</Text>
-            <Text style={[styles.orderDate, { color: theme.textSecondary }]}>
-              {formatDate(order.created_at || order.date)}
-            </Text>
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <LinearGradient colors={premium.gradientPrimary} style={styles.summaryCard} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+          <View style={styles.summaryTop}>
+            <Text style={styles.summaryOrder}>Order #{order.id}</Text>
+            <View style={[styles.statusPill, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+              <Text style={styles.statusPillText}>{meta.label}</Text>
+            </View>
           </View>
-          
-          <View style={styles.statusContainer}>
-            <Text style={[styles.statusLabel, { color: theme.text }]}>Status:</Text>
-            <Text style={[styles.statusValue, { color: getStatusColor(order.status) }]}>
-              {order.status}
-            </Text>
-          </View>
+          <Text style={styles.summaryDate}>{formatOrderDateTime(order.created_at || order.date)}</Text>
+          <Text style={styles.summaryTotal}>${orderTotal.toFixed(2)}</Text>
+        </LinearGradient>
 
-          <View style={styles.totalContainer}>
-            <Text style={[styles.totalLabel, { color: theme.text }]}>Total Amount:</Text>
-            <Text style={[styles.totalValue, { color: theme.primary }]}>
-              ${orderTotal.toFixed(2)}
-            </Text>
-          </View>
-        </View>
+        <OrderTrackingSteps status={order.status} />
 
-        {/* Order Items */}
-        <View style={styles.itemsSection}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Order Items</Text>
-          
-          {order.items && order.items.length > 0 ? (
-            <FlatList
-              data={order.items}
-              keyExtractor={(item, index) => `${item.id || index}`}
-              renderItem={({ item }) => <OrderItemCard item={item} theme={theme} />}
-              scrollEnabled={false}
-            />
-          ) : (
-            <View style={[styles.noItems, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-              <Text style={[styles.noItemsText, { color: theme.textSecondary }]}>
-                No items found for this order
+        {(order.delivery_address || order.shipping_address) && (
+          <TouchableOpacity style={styles.addressCard} activeOpacity={0.9}>
+            <LinearGradient colors={['rgba(99,102,241,0.15)', 'rgba(139,92,246,0.08)']} style={styles.addressIcon}>
+              <Ionicons name="location" size={22} color={premium.indigo} />
+            </LinearGradient>
+            <View style={styles.addressBody}>
+              <Text style={styles.addressLabel}>Delivery address</Text>
+              <Text style={styles.addressName}>{order.recipient_name || 'Customer'}</Text>
+              <Text style={styles.addressText}>
+                {order.delivery_address || order.shipping_address}
               </Text>
             </View>
-          )}
+            <Ionicons name="chevron-forward" size={20} color={premium.textMuted} />
+          </TouchableOpacity>
+        )}
+
+        <Text style={styles.sectionTitle}>Order items</Text>
+        {order.items?.length > 0 ? (
+          order.items.map((item, index) => <OrderLineItem key={item.id || index} item={item} />)
+        ) : (
+          <Text style={styles.noItems}>No items in this order</Text>
+        )}
+
+        <View style={styles.paymentCard}>
+          <Text style={styles.paymentTitle}>Payment summary</Text>
+          <View style={styles.paymentRow}>
+            <Text style={styles.paymentLabel}>Subtotal</Text>
+            <Text style={styles.paymentValue}>${subtotal.toFixed(2)}</Text>
+          </View>
+          <View style={styles.paymentRow}>
+            <Text style={styles.paymentLabel}>Shipping</Text>
+            <Text style={styles.paymentValue}>${shipping.toFixed(2)}</Text>
+          </View>
+          <View style={styles.paymentRow}>
+            <Text style={styles.paymentLabel}>Tax</Text>
+            <Text style={styles.paymentValue}>${tax.toFixed(2)}</Text>
+          </View>
+          <View style={[styles.paymentRow, styles.paymentTotalRow]}>
+            <Text style={styles.totalLabel}>Total amount</Text>
+            <Text style={styles.totalValue}>${orderTotal.toFixed(2)}</Text>
+          </View>
         </View>
 
-        {/* Delivery Info */}
-        {order.delivery_address && (
-          <View style={[styles.deliveryInfo, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>Delivery Information</Text>
-            <Text style={[styles.deliveryText, { color: theme.textSecondary }]}>
-              {order.delivery_address}
-            </Text>
+        <TouchableOpacity
+          style={styles.supportCard}
+          activeOpacity={0.9}
+          onPress={() => premiumAlert('Support', 'Our team will assist you shortly.', [{ text: 'OK' }], { variant: 'info' })}
+        >
+          <LinearGradient colors={premium.gradientSignIn} style={styles.supportIcon}>
+            <Ionicons name="headset" size={24} color="#fff" />
+          </LinearGradient>
+          <View style={styles.supportText}>
+            <Text style={styles.supportTitle}>Need help?</Text>
+            <Text style={styles.supportSub}>Contact our support team</Text>
           </View>
-        )}
+          <Ionicons name="chevron-forward" size={22} color={premium.emerald} />
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    paddingTop: 50,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  backButton: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    width: 40,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  placeholder: {
-    width: 40,
-  },
-  content: {
-    flex: 1,
-    padding: 16,
-  },
-  orderInfo: {
-    borderRadius: 12,
-    padding: 16,
+const createStyles = (premium) => ({
+
+  container: { flex: 1, backgroundColor: premium.background },
+  scroll: { paddingHorizontal: 20, paddingBottom: 32 },
+  summaryCard: {
+    borderRadius: premium.radiusXl,
+    padding: 22,
     marginBottom: 16,
-    borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    ...premium.shadowCard,
   },
-  orderHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  orderNumber: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  orderDate: {
-    fontSize: 14,
-  },
-  statusContainer: {
+  summaryTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  summaryOrder: { fontSize: 20, fontWeight: '800', color: '#fff' },
+  statusPill: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999 },
+  statusPillText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  summaryDate: { fontSize: 14, color: 'rgba(255,255,255,0.85)', marginBottom: 12 },
+  summaryTotal: { fontSize: 32, fontWeight: '800', color: '#fff', letterSpacing: -0.5 },
+  addressCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
-  },
-  statusLabel: {
-    fontSize: 16,
-    marginRight: 8,
-  },
-  statusValue: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  totalContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  totalLabel: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  totalValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  itemsSection: {
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 12,
-  },
-  itemCard: {
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-  },
-  itemInfo: {
-    flex: 1,
-  },
-  itemName: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  itemPrice: {
-    fontSize: 14,
-    marginBottom: 2,
-  },
-  itemTotal: {
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  noItems: {
-    borderRadius: 8,
+    backgroundColor: premium.surface,
+    borderRadius: premium.radiusLg,
     padding: 16,
+    marginBottom: 20,
     borderWidth: 1,
+    borderColor: premium.border,
+    ...premium.shadowSoft,
+  },
+  addressIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
     alignItems: 'center',
-  },
-  noItemsText: {
-    fontSize: 14,
-  },
-  deliveryInfo: {
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-  },
-  deliveryText: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  loadingContainer: {
-    flex: 1,
     justifyContent: 'center',
-    alignItems: 'center',
+    marginRight: 12,
   },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 32,
-  },
-  emptyIcon: {
-    fontSize: 64,
+  addressBody: { flex: 1 },
+  addressLabel: { fontSize: 12, fontWeight: '600', color: premium.textMuted, marginBottom: 4 },
+  addressName: { fontSize: 15, fontWeight: '700', color: premium.text, marginBottom: 2 },
+  addressText: { fontSize: 13, color: premium.textSecondary, lineHeight: 18 },
+  sectionTitle: { fontSize: 18, fontWeight: '800', color: premium.text, marginBottom: 12 },
+  noItems: { color: premium.textMuted, marginBottom: 16 },
+  paymentCard: {
+    backgroundColor: premium.surface,
+    borderRadius: premium.radiusLg,
+    padding: 18,
+    marginTop: 8,
     marginBottom: 16,
+    borderWidth: 1,
+    borderColor: premium.border,
+    ...premium.shadowSoft,
   },
-  emptyTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 8,
+  paymentTitle: { fontSize: 16, fontWeight: '800', color: premium.text, marginBottom: 14 },
+  paymentRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
+  paymentLabel: { fontSize: 14, color: premium.textSecondary, fontWeight: '500' },
+  paymentValue: { fontSize: 14, fontWeight: '700', color: premium.text },
+  paymentTotalRow: {
+    marginTop: 8,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: premium.border,
+    marginBottom: 0,
   },
-  emptySubtitle: {
-    fontSize: 16,
-    textAlign: 'center',
+  totalLabel: { fontSize: 16, fontWeight: '700', color: premium.text },
+  totalValue: { fontSize: 22, fontWeight: '800', color: premium.emerald },
+  supportCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: premium.surface,
+    borderRadius: premium.radiusLg,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: premium.border,
+    ...premium.shadowSoft,
   },
+  supportIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+  },
+  supportText: { flex: 1 },
+  supportTitle: { fontSize: 16, fontWeight: '700', color: premium.text },
+  supportSub: { fontSize: 13, color: premium.textSecondary, marginTop: 2 },
 });
+
